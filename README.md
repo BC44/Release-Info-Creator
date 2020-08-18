@@ -1,5 +1,5 @@
 # MediaInfo_ScreenshotGenerator
-Generates mediainfo and screenshots automatically given a video file and pastes it to your clipboard.
+Generates mediainfo and screenshots automatically given a video file, uploads them, then pastes the resulting mediainfo and image URLs to your clipboard.
 
 Requires minimum Python 3.6
 
