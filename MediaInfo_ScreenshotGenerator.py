@@ -16,7 +16,7 @@ IMGBB_KEY = ''
 
 MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name *:).+'
 
-DAR_RE = r'Display aspect ratio *: (\d+):(\d+)'
+DAR_RE = r'Display aspect ratio *: (\d+(?:\.\d+)):(\d+)'
 HEIGHT_RE = r'Height *: (\d+) pixels'
 
 
@@ -43,8 +43,8 @@ def main():
 
 def getDAR(main_mediainfo):
 	m = re.search(DAR_RE, main_mediainfo)
-	aspect_width = int(m.group(1))
-	aspect_height = int(m.group(2))
+	aspect_width = float(m.group(1))
+	aspect_height = float(m.group(2))
 
 	pixel_height = re.search(HEIGHT_RE, main_mediainfo).group(1)
 	pixel_height = int(pixel_height)
