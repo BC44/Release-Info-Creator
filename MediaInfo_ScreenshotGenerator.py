@@ -14,21 +14,45 @@ from PIL import Image
 IMAGE_SAVE_LOCATION = r''
 IMGBB_KEY = ''
 
-MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name.+?:).+'
+MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name *:).+'
+
+DAR_RE = r'Display aspect ratio *: (\d+):(\d+)'
+HEIGHT_RE = r'Height *: (\d+) pixels'
+
 
 def main():
 	videoFile = sys.argv[1]
 	IFO_mediainfo = ''
 	main_mediainfo = '[mediainfo]\n' + getMediaInfo(videoFile) + '[/mediainfo]'
+	param_DAR = ''
 
 	if videoFile.endswith(('.vob', '.VOB')):
 		IFO_file = getIFOfile(videoFile)
 		IFO_mediainfo = '[mediainfo]\n' + getMediaInfo(IFO_file) + '[/mediainfo]'
 
-	images = generateScreenshots(videoFile, 6)
+		DAR = getDAR(main_mediainfo)
+		param_DAR = f'-vf "scale={DAR}"'
+
+	images = generateScreenshots(videoFile, n=6, param_DAR=param_DAR)
 	imageURLs = uploadImages(images)
 
-	pyperclip.copy(main_mediainfo + '\n\n' + IFO_mediainfo + '\n\n' + imageURLs)
+	pyperclip.copy(main_mediainfo + '\n\n' + IFO_mediainfo + '\n' + imageURLs)
+
+	print('Mediainfo + image URLs pasted to clipboard.\n')
+
+
+def getDAR(main_mediainfo):
+	m = re.search(DAR_RE, main_mediainfo)
+	aspect_width = int(m.group(1))
+	aspect_height = int(m.group(2))
+
+	pixel_height = re.search(HEIGHT_RE, main_mediainfo).group(1)
+	pixel_height = int(pixel_height)
+
+	pixel_width = pixel_height/aspect_height * aspect_width
+	pixel_width = int(pixel_width)
+
+	return f'{pixel_width}:{pixel_height}'
 
 
 def getIFOfile(videoFile):
@@ -54,7 +78,7 @@ def getMediaInfo(primaryVideoFilepath):
 	return mediainfo
 
 
-def generateScreenshots(videoFilepath, n):
+def generateScreenshots(videoFilepath, n=6, param_DAR=''):
 	savedImages = []
 	timeStamp = 45
 	increaseBy = 30
@@ -64,9 +88,7 @@ def generateScreenshots(videoFilepath, n):
 		outputFile = f'snapshot_{i} {now}'
 		outputFilePath = os.path.join(IMAGE_SAVE_LOCATION, outputFile)
 
-		subprocess.call(fr'ffmpeg -hide_banner -loglevel panic -ss {timeStamp} -i "{videoFilepath}" -vf "select=gt(scene\,0.01)" -r 1 -frames:v 1 "{outputFilePath}.png"', shell=True)
-
-		# input(outputFile)
+		subprocess.call(fr'ffmpeg -hide_banner -loglevel panic -ss {timeStamp} -i "{videoFilepath}" -vf "select=gt(scene\,0.01)" {param_DAR} -r 1 -frames:v 1 "{outputFilePath}.png"', shell=True)
 
 		picture = Image.open(f'{outputFilePath}.png')
 		picture.save(f'{outputFilePath}.jpg',optimize=True,quality=15)
@@ -108,6 +130,9 @@ def uploadImages(images):
 
 			r = requests.post(url=endpoint_imgbb, data=formdata_imgbb)
 		returned_data = json.loads(r.text)
+		if returned_data.get('status_code', None) is not None:
+			print('POST request error ', returned_data['status_code'], ', ', returned_data['status_txt'], ', ', returned_data['error']['message'])
+			exit()
 
 		url_main = returned_data['data']['url']
 		# url_thumb = returned_data['data']['medium']['url']
