@@ -16,7 +16,7 @@ IMGBB_KEY = ''
 
 MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name *:).+'
 
-DAR_RE = r'Display aspect ratio *: (\d+(?:\.\d+)):(\d+)'
+DAR_RE = r'Display aspect ratio *: (\d+(?:\.\d+)?):(\d+)'
 HEIGHT_RE = r'Height *: (\d+) pixels'
 
 
@@ -30,7 +30,7 @@ def main():
 		IFO_file = getIFOfile(videoFile)
 		IFO_mediainfo = '[mediainfo]\n' + getMediaInfo(IFO_file) + '[/mediainfo]'
 
-		DAR = getDAR(main_mediainfo)
+		DAR = getDAR(IFO_mediainfo)
 		param_DAR = f'-vf "scale={DAR}"'
 
 	images = generateScreenshots(videoFile, n=6, param_DAR=param_DAR)
@@ -41,12 +41,12 @@ def main():
 	print('Mediainfo + image URLs pasted to clipboard.\n')
 
 
-def getDAR(main_mediainfo):
-	m = re.search(DAR_RE, main_mediainfo)
+def getDAR(mediainfo):
+	m = re.search(DAR_RE, mediainfo)
 	aspect_width = float(m.group(1))
 	aspect_height = float(m.group(2))
 
-	pixel_height = re.search(HEIGHT_RE, main_mediainfo).group(1)
+	pixel_height = re.search(HEIGHT_RE, mediainfo).group(1)
 	pixel_height = int(pixel_height)
 
 	pixel_width = pixel_height/aspect_height * aspect_width
