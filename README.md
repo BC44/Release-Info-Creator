@@ -9,4 +9,9 @@ Set `IMAGE_SAVE_LOCATION` to your desired save location for screenshots and `IMG
 
 
 # Usage
-    py MediaScreenGen.py "vob_file.vob"
+	
+	> Detects `*.ifo` file in the same directory and gathers mediainfo from it as well
+
+    py MediaScreenGen.py "video_file.vob"
+
+    py MediaScreenGen.py "video_file.mkv"
