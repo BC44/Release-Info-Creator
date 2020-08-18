@@ -14,19 +14,36 @@ from PIL import Image
 IMAGE_SAVE_LOCATION = r''
 IMGBB_KEY = ''
 
-# TV_RE = r'[\d\W]e ?\d+\b|\b\d+ ?x ?\d+\b'
 MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name.+?:).+'
-# RESOLUTION_RE = r'\b\d{3,4}[ip]\b'
 
 def main():
-	vobfile = sys.argv[1]
-	VOB_mediainfo = getMediaInfo(vobfile)
-	IFO_mediainfo = getMediaInfo(os.path.splitext(vobfile)[0] + '.ifo')
-	images = generateScreenshots(vobfile, 6)
-	bbcodeImageStrings = uploadImages(images)
+	videoFile = sys.argv[1]
+	IFO_mediainfo = ''
+	main_mediainfo = '[mediainfo]\n' + getMediaInfo(videoFile) + '[/mediainfo]'
 
-	pyperclip.copy(VOB_mediainfo + '\n\n' + IFO_mediainfo + '\n\n' + bbcodeImageStrings)
-	
+	if videoFile.endswith(('.vob', '.VOB')):
+		IFO_file = getIFOfile(videoFile)
+		IFO_mediainfo = '[mediainfo]\n' + getMediaInfo(IFO_file) + '[/mediainfo]'
+
+	images = generateScreenshots(videoFile, 6)
+	imageURLs = uploadImages(images)
+
+	pyperclip.copy(main_mediainfo + '\n\n' + IFO_mediainfo + '\n\n' + imageURLs)
+
+
+def getIFOfile(videoFile):
+	basefolder = os.path.dirname(videoFile)
+	IFO_files = [os.path.join(basefolder, f) for f in os.listdir(basefolder) if f.endswith(('.ifo', '.IFO'))]
+
+	largestIFO = IFO_files[0]
+	largestSize = os.path.getsize(largestIFO)
+
+	for ifo in IFO_files:
+		filesize = os.path.getsize(ifo)
+		if filesize > largestSize:
+			largestIFO = ifo
+			largestSize = filesize
+	return largestIFO
 
 
 def getMediaInfo(primaryVideoFilepath):
@@ -77,7 +94,7 @@ def keep_n_largest(savedImages, n):
 
 
 def uploadImages(images):
-	bbcodeImageStrings = []
+	imageURLs = ''
 	endpoint_imgbb = 'https://api.imgbb.com/1/upload'
 
 	for i, image in enumerate(images):
@@ -92,12 +109,13 @@ def uploadImages(images):
 			r = requests.post(url=endpoint_imgbb, data=formdata_imgbb)
 		returned_data = json.loads(r.text)
 
-		url_main = returned_data['data']['url_viewer']
-		url_thumb = returned_data['data']['medium']['url']
-		str_temp = f'[url={url_main}][img=320]{url_thumb}[/img][/url]'
-		bbcodeImageStrings.append(str_temp)
+		url_main = returned_data['data']['url']
+		# url_thumb = returned_data['data']['medium']['url']
+		# str_temp = f'[url={url_main}][img=320]{url_thumb}[/img][/url]'
+		imageURLs += url_main + '\n'
 
-	return bbcodeImageStrings
+	return imageURLs
+
 
 
 if __name__ == '__main__':
