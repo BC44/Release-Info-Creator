@@ -7,6 +7,8 @@ Requires minimum Python 3.6
 # Setup
 Set `IMAGE_SAVE_LOCATION` to your desired save location for screenshots and `IMGBB_KEY` for your [imgbb](https://imgbb.com/) account's API key inside the .py file
 
+Run `pip3 install -r requirements.txt`
+
 
 # Usage
 	
