@@ -23,12 +23,12 @@ HEIGHT_RE = r'Height *: (\d+) pixels'
 def main():
 	videoFile = sys.argv[1]
 	IFO_mediainfo = ''
-	main_mediainfo = '[mediainfo]\n' + getMediaInfo(videoFile) + '[/mediainfo]'
+	main_mediainfo = '[mediainfo]\n' + getMediaInfo(videoFile).strip() + '\n[/mediainfo]\n\n'
 	param_DAR = ''
 
 	if videoFile.endswith(('.vob', '.VOB')):
 		IFO_file = getIFOfile(videoFile)
-		IFO_mediainfo = '[mediainfo]\n' + getMediaInfo(IFO_file) + '[/mediainfo]'
+		IFO_mediainfo = '[mediainfo]\n' + getMediaInfo(IFO_file).strip() + '\n[/mediainfo]\n\n'
 
 		DAR = getDAR(IFO_mediainfo)
 		param_DAR = f'-vf "scale={DAR}"'
@@ -36,9 +36,9 @@ def main():
 	images = generateScreenshots(videoFile, n=6, param_DAR=param_DAR)
 	imageURLs = uploadImages(images)
 
-	pyperclip.copy(main_mediainfo + '\n\n' + IFO_mediainfo + '\n' + imageURLs)
+	pyperclip.copy(IFO_mediainfo + main_mediainfo + imageURLs)
 
-	print('Mediainfo + image URLs pasted to clipboard.\n')
+	print('Mediainfo + image URLs pasted to clipboard.')
 
 
 def getDAR(mediainfo):
@@ -80,23 +80,20 @@ def getMediaInfo(primaryVideoFilepath):
 
 def generateScreenshots(videoFilepath, n=6, param_DAR=''):
 	savedImages = []
-	timeStamp = 45
-	increaseBy = 30
+	timestamps = getTimestamps(videoFilepath, n + 2)
 
-	for i in range(0, n + 2):
+	for i, timestamp in enumerate(timestamps):
 		now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
 		outputFile = f'snapshot_{i} {now}'
 		outputFilePath = os.path.join(IMAGE_SAVE_LOCATION, outputFile)
 
-		subprocess.call(fr'ffmpeg -hide_banner -loglevel panic -ss {timeStamp} -i "{videoFilepath}" -vf "select=gt(scene\,0.01)" {param_DAR} -r 1 -frames:v 1 "{outputFilePath}.png"', shell=True)
+		subprocess.call(fr'ffmpeg -hide_banner -loglevel panic -ss {timestamp} -i "{videoFilepath}" -vf "select=gt(scene\,0.01)" {param_DAR} -r 1 -frames:v 1 "{outputFilePath}.png"', shell=True)
 
 		picture = Image.open(f'{outputFilePath}.png')
 		picture.save(f'{outputFilePath}.jpg',optimize=True,quality=15)
 
 		compressedSize = os.path.getsize(f'{outputFilePath}.jpg')
 		savedImages.append({'path': outputFilePath, 'size': compressedSize})
-
-		timeStamp += increaseBy
 
 	return keep_n_largest(savedImages, n)
 
@@ -123,24 +120,43 @@ def uploadImages(images):
 		now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
 		with open(image, 'rb') as f:
 			formdata_imgbb = {
-			'key': IMGBB_KEY, 
-			'image': base64.b64encode(f.read()),
-			'name': f'{i}_Snapshot {now}'
+				'key': IMGBB_KEY, 
+				'image': base64.b64encode(f.read()),
+				'name': f'{i}_snapshot {now}'
 			}
 
-			r = requests.post(url=endpoint_imgbb, data=formdata_imgbb)
-		returned_data = json.loads(r.text)
-		if returned_data.get('status_code', None) is not None:
-			print('POST request error ', returned_data['status_code'], ', ', returned_data['status_txt'], ', ', returned_data['error']['message'])
+			resp = requests.post(url=endpoint_imgbb, data=formdata_imgbb)
+
+		resp = json.loads(resp.text)
+		if resp.get('status_code', None) is not None:
+			print('POST request error ', resp['status_code'], ', ', resp['status_txt'], ', ', resp['error']['message'])
 			exit()
 
-		url_main = returned_data['data']['url']
-		# url_thumb = returned_data['data']['medium']['url']
-		# str_temp = f'[url={url_main}][img=320]{url_thumb}[/img][/url]'
-		imageURLs += url_main + '\n'
+		direct_URL = resp['data']['url']
+		imageURLs += direct_URL + '\n'
 
 	return imageURLs
 
+
+def getTimestamps(videoFilepath, n):
+	timestamps = []
+	mediainfo_json = subprocess.check_output(f'mediainfo --Output=JSON "{videoFilepath}"', shell=True).decode()
+	mediainfo_json = json.loads(mediainfo_json)
+	totalRuntimeSecs = float(mediainfo_json['media']['track'][0]['Duration'])
+
+	# initial timestamp set to 5% of total runtime
+	minTimestampSecs = int(totalRuntimeSecs * 0.05)
+	# max timestamp set to 60% of total runtime
+	maxTimestampSecs = totalRuntimeSecs * 0.6
+
+	increaseIntervalSecs = (maxTimestampSecs - minTimestampSecs) / n
+	increaseIntervalSecs = int(increaseIntervalSecs)
+
+	for i in range(0, n):
+		nextTimestamp = minTimestampSecs + i*increaseIntervalSecs
+		timestamps.append(nextTimestamp)
+
+	return timestamps
 
 
 if __name__ == '__main__':
