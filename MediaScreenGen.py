@@ -30,6 +30,13 @@ def main():
 		IFO_file = getIFOfile(videoFile)
 		IFO_mediainfo = '[mediainfo]\n' + getMediaInfo(IFO_file).strip() + '\n[/mediainfo]\n\n'
 
+		parentPath = os.path.dirname(videoFile)
+		if parentPath.endswith(('VIDEO_TS', 'video_ts')):
+			DVD_Name = os.path.dirname(parentPath)
+			DVD_Name = os.path.basename(DVD_Name)
+			IFO_mediainfo = f'[size=4][b]{DVD_Name}[/b][/size]\n\n' + IFO_mediainfo
+
+
 		DAR = getDAR(IFO_mediainfo)
 		param_DAR = f'-vf "scale={DAR}"'
 
