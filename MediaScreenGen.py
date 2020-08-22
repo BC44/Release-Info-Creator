@@ -22,6 +22,7 @@ MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name *:).+'
 
 DAR_RE = r'Display aspect ratio *: (\d+(?:\.\d+)?):(\d+)'
 HEIGHT_RE = r'Height *: (\d+) pixels'
+WIDTH_RE = r'Width *: (\d+) pixels'
 
 
 def main():
@@ -40,7 +41,6 @@ def main():
 			DVD_Name = os.path.basename(DVD_Name)
 			IFO_mediainfo = f'[size=4][b]{DVD_Name}[/b][/size]\n\n' + IFO_mediainfo
 
-
 		DAR = getDAR(IFO_mediainfo)
 		param_DAR = f'-vf "scale={DAR}"'
 
@@ -58,9 +58,17 @@ def getDAR(mediainfo):
 
 	pixel_height = re.search(HEIGHT_RE, mediainfo).group(1)
 	pixel_height = int(pixel_height)
-
-	pixel_width = pixel_height/aspect_height * aspect_width
+	pixel_width = re.search(WIDTH_RE, mediainfo).group(1)
 	pixel_width = int(pixel_width)
+
+	temp_pixel_width = pixel_height/aspect_height * aspect_width
+	temp_pixel_width = int(pixel_width)
+
+	if temp_pixel_width >= pixel_width:
+		pixel_width = temp_pixel_width
+	else:
+		pixel_height = pixel_width/aspect_width * aspect_height
+		pixel_height = int(pixel_height)
 
 	return f'{pixel_width}:{pixel_height}'
 
