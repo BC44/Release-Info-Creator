@@ -13,6 +13,10 @@ from PIL import Image
 
 IMAGE_SAVE_LOCATION = r''
 IMGBB_KEY = ''
+PTPIMG_KEY = ''
+
+ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
+ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
 
 MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name *:).+'
 
@@ -41,10 +45,9 @@ def main():
 		param_DAR = f'-vf "scale={DAR}"'
 
 	images = generateScreenshots(videoFile, n=6, param_DAR=param_DAR)
-	imageURLs = uploadImages(images)
+	imageURLs = upload_PTPIMG(images)
 
 	pyperclip.copy(IFO_mediainfo + main_mediainfo + imageURLs)
-
 	print('Mediainfo + image URLs pasted to clipboard.')
 
 
@@ -119,20 +122,19 @@ def keep_n_largest(savedImages, n):
 	return [f['path'] + '.png' for f in savedImages[0:n]]
 
 
-def uploadImages(images):
+def upload_IMGBB(images):
 	imageURLs = ''
-	endpoint_imgbb = 'https://api.imgbb.com/1/upload'
 
 	for i, image in enumerate(images):
 		now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
 		with open(image, 'rb') as f:
-			formdata_imgbb = {
+			formdata = {
 				'key': IMGBB_KEY, 
 				'image': base64.b64encode(f.read()),
 				'name': f'{i}_snapshot {now}'
 			}
 
-			resp = requests.post(url=endpoint_imgbb, data=formdata_imgbb)
+			resp = requests.post(url=ENDPOINT_IMGBB, data=formdata)
 
 		resp = json.loads(resp.text)
 		if resp.get('status_code', None) is not None:
@@ -143,6 +145,27 @@ def uploadImages(images):
 		imageURLs += direct_URL + '\n'
 
 	return imageURLs
+
+
+def upload_PTPIMG(images):
+	imageURLs = ''
+
+	for i, image in enumerate(images):
+		now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
+		imageBasename = os.path.basename(image)
+		with open(image, 'rb') as f:
+			formdata = {'api_key': PTPIMG_KEY}
+			files = {('file-upload[0]', (imageBasename, f, 'image/png'))}
+
+			resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=formdata)
+			resp = json.loads(resp.text)
+
+			imageID = resp[0]['code']
+			direct_URL = f'https://ptpimg.me/{imageID}.png'
+			imageURLs += direct_URL + '\n'
+
+	return imageURLs
+
 
 
 def getTimestamps(videoFilepath, n):
