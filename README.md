@@ -14,6 +14,6 @@ Run `pip3 install -r requirements.txt`
 	
 	> Detects `*.ifo` file in the same directory and gathers mediainfo from it as well
 
-    py MediaScreenGen.py "video_file.vob"
+    py MediaScreenGen.py "DVD_main_folder"
 
     py MediaScreenGen.py "video_file.mkv"
