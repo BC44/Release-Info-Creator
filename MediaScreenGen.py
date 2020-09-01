@@ -268,18 +268,21 @@ class ImageUploader():
 
 
 def main():
+    print('Getting media info(s)')
     rls = ReleaseInfo(os.path.abspath(sys.argv[1]))
     release_info = rls.GetCompleteMediaInfo()
 
+    print('Generating screenshots')
     screenshot_gen = ScreenshotsGenerator(rls, n=6)
     images = screenshot_gen.GenerateScreenshots()
 
+    print('Uploading images')
     uploader = ImageUploader(images, host='PTPIMG')
     uploader.Upload()
     image_urls = uploader.GetImageURLs()
 
     pyperclip.copy(release_info + image_urls)
-    print('Mediainfo + image URLs pasted to clipboard.')
+    print(' > Mediainfo(s) + image URLs pasted to clipboard')
 
 
 def GetLargestFile(files):
