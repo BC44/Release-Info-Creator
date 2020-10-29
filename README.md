@@ -1,19 +1,17 @@
-# MediaInfo_ScreenshotGenerator
+# Release-Info-Creator
 Generates mediainfo and screenshots automatically given a video file, uploads them, then pastes the resulting mediainfo and image URLs to your clipboard.
 
 Requires minimum Python 3.6
 
 
 # Setup
-Set `IMAGE_SAVE_LOCATION` to your desired save location for screenshots and `IMGBB_KEY` for your [imgbb](https://imgbb.com/) account's API key inside the .py file
-
-Run `pip3 install -r requirements.txt`
+Run the script as indicated below. If no config `.json` file exists, a first-run setup will launch and you will be asked to input your preferences / image host API keys
 
 
 # Usage
 	
-	> Detects `*.ifo` file in the same directory and gathers mediainfo from it as well
+> Detects `*.ifo` file in the same directory and gathers mediainfo from it as well
 
-    py MediaScreenGen.py "DVD_main_folder"
+    py Release-Info-Creator.py "DVD_main_folder"
 
-    py MediaScreenGen.py "video_file.mkv"
+    py Release-Info-Creator.py "video_file.mkv"
