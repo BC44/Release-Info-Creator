@@ -11,10 +11,6 @@ import subprocess
 import sys
 from PIL import Image
 
-IMAGE_SAVE_LOCATION = r''
-IMGBB_KEY = ''
-PTPIMG_KEY = ''
-
 ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
 ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
 
@@ -24,9 +20,14 @@ HEIGHT_RE = r'Height *: (\d+) pixels'
 WIDTH_RE = r'Width *: (\d+) pixels'
 
 VIDEO_FILE_TYPES = ('.mkv', '.avi', '.mp4', '.ts')
+CLEAR_FN = 'cls' if os.name == 'nt' else 'clear'
+
+IMAGE_HOSTS = ['IMGBB', 'PTPIMG']
+SETTINGS_JSON_NAME = 'Release-Info-Creator.json'
+SETTINGS = {}
 
 
-class ReleaseInfo():
+class ReleaseInfo:
     def __init__(self, main_folder_path):
         self.main_folder_path = main_folder_path
         self.release_type = ''
@@ -71,7 +72,7 @@ class ReleaseInfo():
 
             return [largest_filepath]
 
-class DVDAnalyzer():
+class DVDAnalyzer:
     def __init__(self, main_folder_path):
         self.videots_folder_path = os.path.join(main_folder_path, 'VIDEO_TS')
 
@@ -104,7 +105,7 @@ class DVDAnalyzer():
         return main_vob_files
 
 
-class ScreenshotsGenerator():
+class ScreenshotsGenerator:
     def __init__(self, rls, n=6):
         self.n = n
         self.param_DAR = ''
@@ -124,7 +125,7 @@ class ScreenshotsGenerator():
             for timestamp in data['timestamps']:
                 now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
                 output_file = f'snapshot_{temp_num} {now}'
-                output_filepath = os.path.join(IMAGE_SAVE_LOCATION, output_file)
+                output_filepath = os.path.join(SETTINGS['image_save_location'], output_file)
 
                 subprocess.call(
                     fr'ffmpeg -hide_banner -loglevel panic -ss {timestamp} -i "{video_filepath}" -vf "select=gt(scene\,0.01)" {self.param_DAR} -r 1 -frames:v 1 "{output_filepath}.png"',
@@ -211,13 +212,10 @@ class ScreenshotsGenerator():
         return f'{pixel_width}:{pixel_height}'
 
 
-class ImageUploader():
+class ImageUploader:
     def __init__(self, images, host=None):
         assert host is not None, 'Error: No host has been chosen'
-        if host == 'PTPIMG':
-            assert PTPIMG_KEY, 'Error: No API key set for PTPIMG'
-        if host == 'IMGBB':
-            assert IMGBB_KEY, 'Error: No API key set for IMGBB'
+        assert SETTINGS[host + '_KEY'], f'Error: No API key has been set for {host}'
 
         self.host = host
         self.images = images
@@ -237,7 +235,7 @@ class ImageUploader():
             now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
             with open(image, 'rb') as f:
                 formdata = {
-                    'key': IMGBB_KEY, 
+                    'key': SETTINGS['IMGBB_KEY'], 
                     'image': base64.b64encode(f.read()),
                     'name': f'{i}_snapshot {now}'
                 }
@@ -256,8 +254,8 @@ class ImageUploader():
             now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
             image_basename = os.path.basename(image)
             with open(image, 'rb') as f:
-                formdata = {'api_key': PTPIMG_KEY}
-                files = {('file-upload[0]', (image_basename, f, 'image/png'))}
+                formdata = {'api_key': SETTINGS['PTPIMG_KEY']}
+                files = { ('file-upload[0]', (image_basename, f, 'image/png')) }
 
                 resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=formdata)
                 resp = json.loads(resp.text)
@@ -268,21 +266,28 @@ class ImageUploader():
 
 
 def main():
-    print('Getting media info(s)')
+    global SETTINGS
+    SETTINGS = LoadSettings()
+    preferred_host = GetHostPreference()
+
+    assert len(sys.argv) > 1, 'Error, need input file'
+
+    print('  Getting media info(s)')
     rls = ReleaseInfo(os.path.abspath(sys.argv[1]))
     release_info = rls.GetCompleteMediaInfo()
 
-    print('Generating screenshots')
+    print('  Generating screenshots')
     screenshot_gen = ScreenshotsGenerator(rls, n=6)
     images = screenshot_gen.GenerateScreenshots()
 
-    print('Uploading images')
-    uploader = ImageUploader(images, host='PTPIMG')
+    print('  Uploading images')
+    uploader = ImageUploader(images, host=preferred_host)
     uploader.Upload()
     image_urls = uploader.GetImageURLs()
 
     pyperclip.copy(release_info + image_urls)
-    print(' > Mediainfo(s) + image URLs pasted to clipboard')
+    print('Mediainfo(s) + image URLs pasted to clipboard')
+    input('\nPress Enter to close')
 
 
 def GetLargestFile(files):
@@ -296,6 +301,56 @@ def GetLargestFile(files):
             largest_filesize = filesize
 
     return largest_filepath
+
+
+def LoadSettings():
+    script_dir = os.path.dirname(sys.argv[0])
+    settings_json_location = os.path.join(script_dir, SETTINGS_JSON_NAME)
+    try:
+        with open(settings_json_location, 'r', encoding='utf8') as f:
+            settings = json.load(f)
+        return settings
+    except Exception:
+        return QueryNewSettings(settings_json_location)
+
+
+def GetHostPreference():
+    bad_choice_msg = ''
+    max_num = len(IMAGE_HOSTS)
+
+    while True:
+        print(f'{bad_choice_msg}Choose an image host to use: ')
+        for i, image_host in enumerate(IMAGE_HOSTS):
+            print(f' {i + 1}: {image_host}')
+        print('')
+        choice = input(f'Your choice (between {1} and {max_num}): ')
+        if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
+            bad_choice_msg = 'Bad choice. Try again.\n'
+            subprocess.call(CLEAR_FN, shell=True)
+            continue
+        else:
+            n = int(choice)
+            return IMAGE_HOSTS[n - 1]
+
+
+def QueryNewSettings(settings_json_location):
+    settings = {}
+    retry = True
+
+    while retry:
+        print(f'Input your settings to be saved into {SETTINGS_JSON_NAME}')
+        for image_host in IMAGE_HOSTS:
+            key_name = image_host + '_KEY'
+            settings[key_name] = input(f'Input your {image_host} key: ')
+        settings['image_save_location'] = input('Input the image save directory: ')
+
+        print('Your Settings:\n\n', json.dumps(settings, indent=4), '\n')
+        retry = True if input('Edit these settings [Y/n]? ').lower() == 'y' else False
+
+    with open(settings_json_location, 'w', encoding='utf8') as f:
+        json.dump(settings, f, indent=4)
+
+    return settings
 
 
 if __name__ == '__main__':
