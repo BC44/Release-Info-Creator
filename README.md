@@ -5,6 +5,8 @@ Requires minimum Python 3.6
 
 
 # Setup
+Run `pip install -r requirements.txt` to install required modules
+
 Run the script as indicated below. If no config `.json` file exists, a first-run setup will launch and you will be asked to input your preferences / image host API keys
 
 
