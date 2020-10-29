@@ -321,7 +321,7 @@ def GetHostPreference():
     while True:
         print(f'{bad_choice_msg}Choose an image host to use: ')
         for i, image_host in enumerate(IMAGE_HOSTS):
-            print(f' {i + 1}: {image_host}')
+            print(f'  {i + 1}: {image_host}')
         print('')
         choice = input(f'Your choice (between {1} and {max_num}): ')
         if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
@@ -346,8 +346,7 @@ def QueryNewSettings(settings_json_location):
 
         print('\nYour Settings:\n' + json.dumps(settings, indent=4), '\n')
         retry = True if input('Edit these settings [Y/n]? ').lower() == 'y' else False
-        if retry:
-            subprocess.call(CLEAR_FN, shell=True)
+        subprocess.call(CLEAR_FN, shell=True)
 
     with open(settings_json_location, 'w', encoding='utf8') as f:
         json.dump(settings, f, indent=4)
