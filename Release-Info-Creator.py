@@ -9,6 +9,7 @@ import re
 import requests
 import subprocess
 import sys
+import time
 from PIL import Image
 
 ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
@@ -272,6 +273,7 @@ def main():
 
     assert len(sys.argv) > 1, 'Error, need input file'
 
+    subprocess.call(CLEAR_FN, shell=True)
     print('  Getting media info(s)')
     rls = ReleaseInfo(os.path.abspath(sys.argv[1]))
     release_info = rls.GetCompleteMediaInfo()
@@ -287,7 +289,7 @@ def main():
 
     pyperclip.copy(release_info + image_urls)
     print('Mediainfo(s) + image URLs pasted to clipboard')
-    input('\nPress Enter to close')
+    time.sleep(5)
 
 
 def GetLargestFile(files):
@@ -317,11 +319,15 @@ def LoadSettings():
 def GetHostPreference():
     bad_choice_msg = ''
     max_num = len(IMAGE_HOSTS)
+    default_choice = GetDefaultChoice()
+    if default_choice is not None:
+        return default_choice
 
     while True:
         print(f'{bad_choice_msg}Choose an image host to use: ')
         for i, image_host in enumerate(IMAGE_HOSTS):
-            print(f'  {i + 1}: {image_host}')
+            set_str = '    (not set)' if not SETTINGS[image_host + '_KEY'] else ''
+            print(f'  {i + 1}: {image_host}{set_str}')
         print('')
         choice = input(f'Your choice (between {1} and {max_num}): ')
         if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
@@ -331,6 +337,17 @@ def GetHostPreference():
         else:
             n = int(choice)
             return IMAGE_HOSTS[n - 1]
+
+
+def GetDefaultChoice():
+    last_available_host = ''
+    for image_host in IMAGE_HOSTS:
+        current_key = SETTINGS[image_host + '_KEY']
+        if current_key and last_available_host:
+            return None
+        if current_key:
+            last_available_host = image_host
+    return last_available_host
 
 
 def QueryNewSettings(settings_json_location):
