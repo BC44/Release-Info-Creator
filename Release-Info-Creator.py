@@ -344,8 +344,10 @@ def QueryNewSettings(settings_json_location):
             settings[key_name] = input(f'Input your {image_host} key: ')
         settings['image_save_location'] = input('Input the image save directory: ')
 
-        print('Your Settings:\n\n', json.dumps(settings, indent=4), '\n')
+        print('\nYour Settings:\n' + json.dumps(settings, indent=4), '\n')
         retry = True if input('Edit these settings [Y/n]? ').lower() == 'y' else False
+        if retry:
+            subprocess.call(CLEAR_FN, shell=True)
 
     with open(settings_json_location, 'w', encoding='utf8') as f:
         json.dump(settings, f, indent=4)
