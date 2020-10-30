@@ -17,10 +17,12 @@ ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
 
 MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name *:).+'
 DAR_RE = r'Display aspect ratio *: (\d+(?:\.\d+)?):(\d+)'
-HEIGHT_RE = r'Height *: (\d+) pixels'
-WIDTH_RE = r'Width *: (\d+) pixels'
+WIDTH_RE = r'Width *: *(\d) ?(\d+) pixels'
+HEIGHT_RE = r'Height *: *(\d) ?(\d+) pixels'
 
 VIDEO_FILE_TYPES = ('.mkv', '.avi', '.mp4', '.ts')
+VOB_EXTS = ('.vob', 'VOB')
+IFO_EXTS = ('.ifo', '.IFO')
 CLEAR_FN = 'cls' if os.name == 'nt' else 'clear'
 
 IMAGE_HOSTS = ['IMGBB', 'PTPIMG']
@@ -78,7 +80,7 @@ class DVDAnalyzer:
         self.videots_folder_path = os.path.join(main_folder_path, 'VIDEO_TS')
 
     def GetIFOfile(self):
-        ifo_files = [os.path.join(self.videots_folder_path, f) for f in os.listdir(self.videots_folder_path) if f.endswith(('.ifo', '.IFO'))]
+        ifo_files = [os.path.join(self.videots_folder_path, f) for f in os.listdir(self.videots_folder_path) if f.endswith(IFO_EXTS)]
 
         largest_ifo = ifo_files[0]
         largest_size = os.path.getsize(largest_ifo)
@@ -91,7 +93,7 @@ class DVDAnalyzer:
         return largest_ifo
 
     def GetMainVobFiles(self):
-        vob_files = [os.path.join(self.videots_folder_path, f) for f in os.listdir(self.videots_folder_path) if f.endswith(('.vob', '.VOB'))]
+        vob_files = [os.path.join(self.videots_folder_path, f) for f in os.listdir(self.videots_folder_path) if f.endswith(VOB_EXTS)]
         assert len(vob_files) > 0, 'No VOB files found in VIDEO_TS'
 
         largest_vob_filepath = GetLargestFile(vob_files)
@@ -112,8 +114,8 @@ class ScreenshotsGenerator:
         self.param_DAR = ''
         self.main_files = rls.main_files
 
-        if rls.release_type == 'DVD':
-            display_aspect_ratio = self._GetDAR(rls.media_infos[0])
+        display_aspect_ratio = self._GetDAR(rls.media_infos[0])
+        if display_aspect_ratio:
             self.param_DAR = f'-vf "scale={display_aspect_ratio}"'
         
     def GenerateScreenshots(self):
@@ -199,18 +201,22 @@ class ScreenshotsGenerator:
         aspect_width = float(m.group(1))
         aspect_height = float(m.group(2))
 
-        pixel_height = int(re.search(HEIGHT_RE, mediainfo).group(1))
-        pixel_width = int(re.search(WIDTH_RE, mediainfo).group(1))
+        m_width = re.search(WIDTH_RE, mediainfo)
+        m_height = re.search(HEIGHT_RE, mediainfo)
+        pixel_width = display_width = int( m_width.group(1) + m_width.group(2) )
+        pixel_height  = display_height = int( m_height.group(1) + m_height.group(2) )
 
-        temp_pixel_width = int(pixel_height/aspect_height * aspect_width)
-
-        if temp_pixel_width >= pixel_width:
-            pixel_width = temp_pixel_width
+        temp_display_width = int( pixel_height/aspect_height * aspect_width )
+        if temp_display_width >= pixel_width:
+            display_width = temp_display_width
+            if abs(display_width - pixel_width) / pixel_width < 0.007:
+                return None
         else:
-            pixel_height = pixel_width/aspect_width * aspect_height
-            pixel_height = int(pixel_height)
+            display_height = int( pixel_width/aspect_width * aspect_height )
+            if abs(display_height - pixel_height) / pixel_height < 0.007:
+                return None
 
-        return f'{pixel_width}:{pixel_height}'
+        return f'{display_width}:{display_height}'
 
 
 class ImageUploader:
@@ -274,21 +280,21 @@ def main():
     assert len(sys.argv) > 1, 'Error, need input file'
 
     subprocess.call(CLEAR_FN, shell=True)
-    print('  Getting media info(s)')
+    print('Getting media info(s)')
     rls = ReleaseInfo(os.path.abspath(sys.argv[1]))
     release_info = rls.GetCompleteMediaInfo()
 
-    print('  Generating screenshots')
+    print('Generating screenshots')
     screenshot_gen = ScreenshotsGenerator(rls, n=6)
     images = screenshot_gen.GenerateScreenshots()
 
-    print('  Uploading images')
+    print('Uploading images')
     uploader = ImageUploader(images, host=preferred_host)
     uploader.Upload()
     image_urls = uploader.GetImageURLs()
 
     pyperclip.copy(release_info + image_urls)
-    print('Mediainfo(s) + image URLs pasted to clipboard')
+    print('\nMediainfo(s) + image URLs pasted to clipboard')
     time.sleep(5)
 
 
@@ -317,19 +323,20 @@ def LoadSettings():
 
 
 def GetHostPreference():
-    bad_choice_msg = ''
-    max_num = len(IMAGE_HOSTS)
     default_choice = GetDefaultChoice()
     if default_choice is not None:
         return default_choice
+
+    bad_choice_msg = ''
+    max_num = len(IMAGE_HOSTS)
 
     while True:
         print(f'{bad_choice_msg}Choose an image host to use: ')
         for i, image_host in enumerate(IMAGE_HOSTS):
             set_str = '    (not set)' if not SETTINGS[image_host + '_KEY'] else ''
             print(f'  {i + 1}: {image_host}{set_str}')
-        print('')
-        choice = input(f'Your choice (between {1} and {max_num}): ')
+
+        choice = input(f'\nYour choice (between {1} and {max_num}): ')
         if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
             bad_choice_msg = 'Bad choice. Try again.\n'
             subprocess.call(CLEAR_FN, shell=True)
@@ -358,7 +365,7 @@ def QueryNewSettings(settings_json_location):
         print(f'Input your settings to be saved into {SETTINGS_JSON_NAME}')
         for image_host in IMAGE_HOSTS:
             key_name = image_host + '_KEY'
-            settings[key_name] = input(f'Input your {image_host} key: ')
+            settings[key_name] = input(f'Input your {image_host} API key: ')
         settings['image_save_location'] = input('Input the image save directory: ')
 
         print('\nYour Settings:\n' + json.dumps(settings, indent=4), '\n')
