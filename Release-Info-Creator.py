@@ -16,10 +16,6 @@ ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
 ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
 
 MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name *:).+'
-DAR_RE = r'Display aspect ratio *: (\d+(?:\.\d+)?):(\d+)'
-WIDTH_RE = r'Width *: *(\d) ?(\d+) pixels'
-HEIGHT_RE = r'Height *: *(\d) ?(\d+) pixels'
-
 VIDEO_FILE_TYPES = ('.mkv', '.avi', '.mp4', '.ts')
 VOB_EXTS = ('.vob', 'VOB')
 IFO_EXTS = ('.ifo', '.IFO')
@@ -114,7 +110,7 @@ class ScreenshotsGenerator:
         self.param_DAR = ''
         self.main_files = rls.main_files
 
-        display_aspect_ratio = self._GetDAR(rls.media_infos[0])
+        display_aspect_ratio = self._GetDAR()
         if display_aspect_ratio:
             self.param_DAR = f'-vf "scale={display_aspect_ratio}"'
         
@@ -196,27 +192,31 @@ class ScreenshotsGenerator:
 
         return main_files_data
 
-    def _GetDAR(self, mediainfo):
-        m = re.search(DAR_RE, mediainfo)
-        aspect_width = float(m.group(1))
-        aspect_height = float(m.group(2))
+    def _GetDAR(self):
+        video_filepath = self.main_files[0]
+        mediainfo_json = subprocess.check_output(f'mediainfo --Output=JSON "{video_filepath}"', shell=True).decode()
+        mediainfo_json = json.loads(mediainfo_json)
+        video_info = self._GetVideoInfo(mediainfo_json)
 
-        m_width = re.search(WIDTH_RE, mediainfo)
-        m_height = re.search(HEIGHT_RE, mediainfo)
-        pixel_width = display_width = int( m_width.group(1) + m_width.group(2) )
-        pixel_height  = display_height = int( m_height.group(1) + m_height.group(2) )
+        pixel_width = display_width = int(video_info['Width'])
+        pixel_height = display_height = int(video_info['Height'])
+        if float(video_info['PixelAspectRatio']) == 1:
+            return f'{pixel_width}:{pixel_height}'
 
-        temp_display_width = int( pixel_height/aspect_height * aspect_width )
+        dar_float = float(video_info['DisplayAspectRatio'])
+        temp_display_width = round(pixel_height * dar_float)
         if temp_display_width >= pixel_width:
             display_width = temp_display_width
-            if abs(display_width - pixel_width) / pixel_width < 0.007:
-                return None
         else:
-            display_height = int( pixel_width/aspect_width * aspect_height )
-            if abs(display_height - pixel_height) / pixel_height < 0.007:
-                return None
+            display_height = round(pixel_width / dar_float)
 
         return f'{display_width}:{display_height}'
+
+    def _GetVideoInfo(self, mediainfo_json):
+        for track in mediainfo_json['media']['track']:
+            if track['@type'] == 'Video':
+                return track
+        return None
 
 
 class ImageUploader:
