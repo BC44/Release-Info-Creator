@@ -294,8 +294,6 @@ def main():
     screenshot_gen = ScreenshotGenerator(n_images=6)
     images = screenshot_gen.GenerateScreenshots(rls)
 
-    exit()
-
     print('Uploading images')
     uploader = ImageUploader(images, host=preferred_host)
     uploader.Upload()
