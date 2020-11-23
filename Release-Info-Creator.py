@@ -27,14 +27,17 @@ SETTINGS = {}
 
 
 class ReleaseInfo:
-    def __init__(self, main_folder_path):
-        self.main_folder_path = main_folder_path
+    def __init__(self, user_set_path):
+        self.user_set_path = user_set_path
         self.release_type = ''
-        self.main_files = []
+        self.main_ifo_file = ''
+        self.main_video_files = []
         self.media_infos = []
 
     def GetCompleteMediaInfo(self):
         relevant_files = self._GetRelevantVideoFiles()
+        header = ''
+        if self.release_type == 'dvd': header = '[size=4][b]' + os.path.basename(self.user_set_path) + '[/b][/size]\n\n'
 
         for video_file in relevant_files:
             base_video_name = os.path.basename(video_file)
@@ -44,36 +47,37 @@ class ReleaseInfo:
 
             self.media_infos.append('[mediainfo]\n' + mediainfo.strip() + '\n[/mediainfo]\n\n')
 
-        if self.release_type == 'DVD':
-            return '[size=4][b]' + os.path.basename(self.main_folder_path) + '[/b][/size]\n\n' + ''.join(self.media_infos)
-        return ''.join(self.media_infos)
+        return header + ''.join(self.media_infos)
 
     def _GetRelevantVideoFiles(self):
-        if os.path.isfile(self.main_folder_path) and self.main_folder_path.endswith(VIDEO_FILE_TYPES):
-            self.main_files = [self.main_folder_path]
-            return [self.main_folder_path]
+        # check if user-set path is of a proper video type
+        if os.path.isfile(self.user_set_path) and self.user_set_path.endswith(VIDEO_FILE_TYPES):
+            self.release_type = 'single'
+            self.main_video_files.append(self.user_set_path)
+            return [self.user_set_path]
         
-        assert os.path.isdir(self.main_folder_path), 'Input path is not a folder or a file of relevant video type' + ', '.join(VIDEO_FILE_TYPES)
+        assert os.path.isdir(self.user_set_path), 'Input path is not a folder or a file of relevant video type' + ', '.join(VIDEO_FILE_TYPES)
 
-        if os.path.isdir(os.path.join(self.main_folder_path, 'VIDEO_TS')):
-            self.release_type = 'DVD'
-            dvd_info = DVDAnalyzer(self.main_folder_path)
-            ifo_filepath = dvd_info.GetIFOfile()
-            self.main_files = dvd_info.GetMainVobFiles()
-            vob_filepath = self.main_files[0]
+        # check if user-set path contains folder 'VIDEO_TS'
+        if os.path.isdir(os.path.join(self.user_set_path, 'VIDEO_TS')):
+            self.release_type = 'dvd'
 
-            return [ifo_filepath, vob_filepath]
+            dvd_info = DVDAnalyzer(self.user_set_path)
+            self.main_ifo_file = dvd_info.GetIFOfile()
+            self.main_video_files = dvd_info.GetMainVobFiles()
+
+            return [ self.main_ifo_file, self.main_video_files[0] ]
         else:
             self.release_type = 'single'
-            video_files = [os.path.join(self.main_folder_path, f) for f in os.listdir(self.main_folder_path) if f.endswith(VIDEO_FILE_TYPES)]
+            video_files = [os.path.join(self.user_set_path, f) for f in os.listdir(self.user_set_path) if f.endswith(VIDEO_FILE_TYPES)]
             largest_filepath = GetLargestFile(video_files)
-            self.main_files = [largest_filepath]
+            self.main_video_files = [largest_filepath]
 
             return [largest_filepath]
 
 class DVDAnalyzer:
-    def __init__(self, main_folder_path):
-        self.videots_folder_path = os.path.join(main_folder_path, 'VIDEO_TS')
+    def __init__(self, user_set_path):
+        self.videots_folder_path = os.path.join(user_set_path, 'VIDEO_TS')
 
     def GetIFOfile(self):
         ifo_files = [os.path.join(self.videots_folder_path, f) for f in os.listdir(self.videots_folder_path) if f.endswith(IFO_EXTS)]
@@ -104,19 +108,17 @@ class DVDAnalyzer:
         return main_vob_files
 
 
-class ScreenshotsGenerator:
-    def __init__(self, rls, n=6):
-        self.n = n
+class ScreenshotGenerator:
+    def __init__(self, n_images=6):
+        self.n_images = n_images
         self.param_DAR = ''
-        self.main_files = rls.main_files
-
-        display_aspect_ratio = self._GetDAR()
-        if display_aspect_ratio:
-            self.param_DAR = f'-vf "scale={display_aspect_ratio}"'
         
-    def GenerateScreenshots(self):
+    def GenerateScreenshots(self, rls):
         saved_images = []
-        timestamp_data = self._GetTimestampData()
+        timestamp_data = self._GetTimestampData(rls)
+
+        display_aspect_ratio = self._GetDAR(rls)
+        self.param_DAR = f'-vf "scale={display_aspect_ratio}"'
 
         temp_num = 0
         for data in timestamp_data:
@@ -139,29 +141,16 @@ class ScreenshotsGenerator:
 
         return self._Keep_n_largest(saved_images)
 
-    def _Keep_n_largest(self, saved_images):
-        for i, _ in enumerate(saved_images):
-            for k in range(i + 1, len(saved_images)):
-                if saved_images[i]['size'] < saved_images[k]['size']:
-                    saved_images[k], saved_images[i] = saved_images[i], saved_images[k]
-
-        for i, file in enumerate(saved_images):
-            os.unlink(file['path'] + '.jpg')
-            if i >= self.n:
-                os.unlink(file['path'] + '.png')
-
-        return [f['path'] + '.png' for f in saved_images[0:self.n]]
-
-    def _GetTimestampData(self):
-        main_files_data = self._GetRuntimeData()
+    def _GetTimestampData(self, rls):
+        main_files_data = self._GetRuntimeData(rls)
         timestamp_data = []
 
         min_timestamp_secs = int(main_files_data['total_runtime'] * 0.05)
         max_timestamp_secs = int(main_files_data['total_runtime'] * 0.6)
-        increase_interval_secs = (max_timestamp_secs - min_timestamp_secs) // self.n
+        increase_interval_secs = (max_timestamp_secs - min_timestamp_secs) // self.n_images
 
         timestamp = min_timestamp_secs
-        num_remaining = self.n
+        num_remaining = self.n_images
         for filedata in main_files_data['runtime_data']:
             timestamps = []
             while num_remaining > 0 and timestamp < filedata['runtime']:
@@ -176,13 +165,13 @@ class ScreenshotsGenerator:
 
         return timestamp_data
 
-    def _GetRuntimeData(self):
+    def _GetRuntimeData(self, rls):
         main_files_data = {
             'total_runtime': 0,
             'runtime_data': []
         }
 
-        for video_filepath in self.main_files:
+        for video_filepath in rls.main_video_files:
             mediainfo_json = subprocess.check_output(f'mediainfo --Output=JSON "{video_filepath}"', shell=True).decode()
             mediainfo_json = json.loads(mediainfo_json)
             total_runtime_secs = float(mediainfo_json['media']['track'][0]['Duration'])
@@ -192,11 +181,15 @@ class ScreenshotsGenerator:
 
         return main_files_data
 
-    def _GetDAR(self):
-        video_filepath = self.main_files[0]
-        mediainfo_json = subprocess.check_output(f'mediainfo --Output=JSON "{video_filepath}"', shell=True).decode()
+    def _GetDAR(self, rls):
+        if rls.release_type == 'dvd':
+            info_file = rls.main_ifo_file
+        else:
+            info_file = rls.main_video_files[0]
+
+        mediainfo_json = subprocess.check_output(f'mediainfo --Output=JSON "{info_file}"', shell=True).decode()
         mediainfo_json = json.loads(mediainfo_json)
-        video_info = self._GetVideoInfo(mediainfo_json)
+        video_info = self._GetVideoData(mediainfo_json)
 
         pixel_width = display_width = int(video_info['Width'])
         pixel_height = display_height = int(video_info['Height'])
@@ -212,7 +205,20 @@ class ScreenshotsGenerator:
 
         return f'{display_width}:{display_height}'
 
-    def _GetVideoInfo(self, mediainfo_json):
+    def _Keep_n_largest(self, saved_images):
+        for i, _ in enumerate(saved_images):
+            for k in range(i + 1, len(saved_images)):
+                if saved_images[i]['size'] < saved_images[k]['size']:
+                    saved_images[k], saved_images[i] = saved_images[i], saved_images[k]
+
+        for i, file in enumerate(saved_images):
+            os.unlink(file['path'] + '.jpg')
+            if i >= self.n_images:
+                os.unlink(file['path'] + '.png')
+
+        return [f['path'] + '.png' for f in saved_images[0:self.n_images]]
+
+    def _GetVideoData(self, mediainfo_json):
         for track in mediainfo_json['media']['track']:
             if track['@type'] == 'Video':
                 return track
@@ -285,8 +291,10 @@ def main():
     release_info = rls.GetCompleteMediaInfo()
 
     print('Generating screenshots')
-    screenshot_gen = ScreenshotsGenerator(rls, n=6)
-    images = screenshot_gen.GenerateScreenshots()
+    screenshot_gen = ScreenshotGenerator(n_images=6)
+    images = screenshot_gen.GenerateScreenshots(rls)
+
+    exit()
 
     print('Uploading images')
     uploader = ImageUploader(images, host=preferred_host)
@@ -342,8 +350,8 @@ def GetHostPreference():
             subprocess.call(CLEAR_FN, shell=True)
             continue
         else:
-            n = int(choice)
-            return IMAGE_HOSTS[n - 1]
+            choice = int(choice)
+            return IMAGE_HOSTS[choice - 1]
 
 
 def GetDefaultChoice():
