@@ -6,7 +6,7 @@ Generates mediainfo and screenshots automatically given a video file, uploads th
 ## Requirements
 Minimum Python 3.6
 
-Directories that contain `mediainfo` and `ffmpeg` binaries should be set to PATH
+`mediainfo` and `ffmpeg` command-line tools
 
 
 
