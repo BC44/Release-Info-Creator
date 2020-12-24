@@ -25,7 +25,6 @@ IMAGE_HOSTS = ['IMGBB', 'PTPIMG']
 SETTINGS_JSON_NAME = 'Release-Info-Creator.json'
 SETTINGS = {}
 
-
 class ReleaseInfo:
     def __init__(self, user_set_path):
         self.user_set_path = user_set_path
@@ -41,7 +40,12 @@ class ReleaseInfo:
 
         for file in relevant_files:
             base_video_name = os.path.basename(file)
-            mediainfo = subprocess.check_output(f'mediainfo "{file}"', shell=True).decode()
+
+            args = '"{mediainfo_bin_location}" "{file}"'.format(
+                mediainfo_bin_location=SETTINGS['mediainfo_bin_location'], 
+                file=file
+                )
+            mediainfo = subprocess.check_output(args, shell=True).decode()
             mediainfo = re.sub(MEDIAINFO_COMPLETE_NAME_RE, fr'\1 {base_video_name}', mediainfo)
             mediainfo = mediainfo.replace('\r\n', '\n')
 
@@ -128,9 +132,14 @@ class ScreenshotGenerator:
                 output_file = f'snapshot_{temp_num} {now}'
                 output_filepath = os.path.join(SETTINGS['image_save_location'], output_file)
 
-                subprocess.call(
-                    fr'ffmpeg -hide_banner -loglevel panic -ss {timestamp} -i "{video_filepath}" -vf "select=gt(scene\,0.01)" {self.param_DAR} -r 1 -frames:v 1 "{output_filepath}.png"',
-                    shell=True)
+                args = r'{ffmpeg_bin_location} -hide_banner -loglevel panic -ss {timestamp} -i "{video_filepath}" -vf "select=gt(scene\,0.01)" {param_DAR} -r 1 -frames:v 1 "{output_filepath}.png"'.format(
+                    ffmpeg_bin_location=SETTINGS['ffmpeg_bin_location'], 
+                    timestamp=timestamp, 
+                    video_filepath=video_filepath, 
+                    param_DAR=self.param_DAR, 
+                    output_filepath=output_filepath
+                    )
+                subprocess.call(args, shell=True)
                 temp_num += 1
 
                 picture = Image.open(f'{output_filepath}.png')
@@ -172,7 +181,11 @@ class ScreenshotGenerator:
         }
 
         for video_filepath in rls.main_video_files:
-            mediainfo_json = subprocess.check_output(f'mediainfo --Output=JSON "{video_filepath}"', shell=True).decode()
+            args = '{mediainfo_bin_location} --Output=JSON "{video_filepath}"'.format(
+                mediainfo_bin_location=SETTINGS['mediainfo_bin_location'], 
+                video_filepath=video_filepath
+                )
+            mediainfo_json = subprocess.check_output(args, shell=True).decode()
             mediainfo_json = json.loads(mediainfo_json)
             total_runtime_secs = float(mediainfo_json['media']['track'][0]['Duration'])
 
@@ -187,7 +200,11 @@ class ScreenshotGenerator:
         else:
             info_file = rls.main_video_files[0]
 
-        mediainfo_json = subprocess.check_output(f'mediainfo --Output=JSON "{info_file}"', shell=True).decode()
+        args = '{mediainfo_bin_location} --Output=JSON "{info_file}"'.format(
+            mediainfo_bin_location=SETTINGS['mediainfo_bin_location'], 
+            info_file=info_file
+            )
+        mediainfo_json = subprocess.check_output(args, shell=True).decode()
         mediainfo_json = json.loads(mediainfo_json)
         video_info = self._get_video_data(mediainfo_json)
 
@@ -320,6 +337,7 @@ def get_largest_file(files):
 def load_settings():
     script_dir = os.path.dirname(sys.argv[0])
     settings_json_location = os.path.join(script_dir, SETTINGS_JSON_NAME)
+
     try:
         with open(settings_json_location, 'r', encoding='utf8') as f:
             settings = json.load(f)
@@ -372,7 +390,10 @@ def query_new_settings(settings_json_location):
         for image_host in IMAGE_HOSTS:
             key_name = image_host + '_KEY'
             settings[key_name] = input(f'Input your {image_host} API key: ')
+
         settings['image_save_location'] = input('Input the image save directory: ')
+        settings['ffmpeg_bin_location'] = input('Input the full path for the ffmpeg binary: ')
+        settings['mediainfo_bin_location'] = input('Input the full path for the mediainfo binary: ')
 
         print('\nYour Settings:\n' + json.dumps(settings, indent=4), '\n')
         retry = True if input('Edit these settings [Y/n]? ').lower() == 'y' else False
