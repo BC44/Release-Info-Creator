@@ -23,6 +23,8 @@ CLEAR_FN = 'cls' if os.name == 'nt' else 'clear'
 
 IMAGE_HOSTS = ['IMGBB', 'PTPIMG']
 SETTINGS_JSON_NAME = 'Release-Info-Creator.json'
+
+SETTINGS_KEYS = ['IMGBB_KEY', 'PTPIMG_KEY', 'image_save_location', 'ffmpeg_bin_location', 'mediainfo_bin_location']
 SETTINGS = {}
 
 class ReleaseInfo:
@@ -341,7 +343,10 @@ def load_settings():
     try:
         with open(settings_json_location, 'r', encoding='utf8') as f:
             settings = json.load(f)
-        return settings
+        if not is_missing_settings(settings):
+            return settings
+        else:
+            return set_missing_settings(settings, settings_json_location)
     except Exception:
         return query_new_settings(settings_json_location)
 
@@ -381,6 +386,25 @@ def get_default_choice():
     return last_available_host
 
 
+def is_missing_settings(settings):
+    for key in SETTINGS_KEYS:
+        if settings.get(key, None) is None:
+            return True
+    return False
+
+
+def set_missing_settings(settings, settings_json_location):
+    for key in SETTINGS_KEYS:
+        if settings.get(key, None) is None:
+            settings[key] = input(f'Input the missing value for "{key}": ').strip('"')
+
+    with open(settings_json_location, 'w', encoding='utf8') as f:
+        json.dump(settings, f, indent=4)
+
+    subprocess.call(CLEAR_FN, shell=True)
+    return settings
+
+
 def query_new_settings(settings_json_location):
     settings = {}
     retry = True
@@ -389,7 +413,7 @@ def query_new_settings(settings_json_location):
         print(f'Input your settings to be saved into {SETTINGS_JSON_NAME}')
         for image_host in IMAGE_HOSTS:
             key_name = image_host + '_KEY'
-            settings[key_name] = input(f'Input your {image_host} API key: ')
+            settings[key_name] = input(f'Input your {image_host} API key (can skip): ')
 
         settings['image_save_location'] = input('Input the image save directory: ')
         settings['ffmpeg_bin_location'] = input('Input the full path for the ffmpeg binary: ')
