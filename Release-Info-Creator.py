@@ -43,12 +43,6 @@ class Settings:
             Settings._query_new_settings()
 
     @staticmethod
-    def load_paths(image_save_location=None, ffmpeg_bin_path=None, mediainfo_bin_path=None):
-        Settings.image_save_location = image_save_location
-        Settings.ffmpeg_bin_path = ffmpeg_bin_path
-        Settings.mediainfo_bin_path = mediainfo_bin_path
-
-    @staticmethod
     def _query_new_settings():
         retry = True
 
