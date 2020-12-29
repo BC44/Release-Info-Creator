@@ -27,7 +27,7 @@ IMAGE_HOST_NAMES = ['ptpimg', 'imgbb']
 
 class Settings:
     settings_file_name = 'Release-Info-Creator.json'
-    settings_file_path = os.path.join( ( os.path.dirname(__file__) ), settings_file_name )
+    settings_file_path = os.path.join( os.path.dirname(__file__), settings_file_name )
     image_hosts = []
     paths = {}
     preferred_host_name = ''
@@ -51,11 +51,11 @@ class Settings:
             Settings._query_image_host_info()
             Settings._query_paths()
 
-            subprocess.call(CLEAR_FN, shell=True)
+            subprocess.run(CLEAR_FN, shell=True)
             print('\nYour Settings:\n' + json.dumps(Settings._get_settings_dict(), indent=4) + '\n')
 
             retry = False if input('Use these settings [Y/n]?').lower() == 'y' else True
-            subprocess.call(CLEAR_FN, shell=True)
+            subprocess.run(CLEAR_FN, shell=True)
 
         with open(Settings.settings_file_path, 'w', encoding='utf8') as f:
             json.dump(Settings._get_settings_dict(), f, indent=4)
@@ -112,7 +112,7 @@ class Settings:
             choice = input(f'\nYour choice (between {1} and {max_num}): ')
             if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
                 bad_choice_msg = 'Bad choice. Try again.\n'
-                subprocess.call(CLEAR_FN, shell=True)
+                subprocess.run(CLEAR_FN, shell=True)
                 continue
             else:
                 return IMAGE_HOST_NAMES[int(choice) - 1]
@@ -249,7 +249,7 @@ class ScreenshotGenerator:
                     param_DAR=self.param_DAR, 
                     output_filepath=output_filepath
                     )
-                subprocess.call(args, shell=True)
+                subprocess.run(args, shell=True)
                 temp_num += 1
 
                 picture = Image.open(f'{output_filepath}.png')
@@ -413,7 +413,7 @@ def main():
 
     assert len(sys.argv) > 1, 'Error, need input file'
 
-    subprocess.call(CLEAR_FN, shell=True)
+    subprocess.run(CLEAR_FN, shell=True)
 
     print(f'Image host "{preferred_host}" will be used for uploading\n')
     print('Getting media info(s)')
