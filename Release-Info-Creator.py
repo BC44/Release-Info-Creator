@@ -57,9 +57,10 @@ class Settings:
             Settings._query_image_host_info()
             Settings._query_paths()
 
+            subprocess.call(CLEAR_FN, shell=True)
             print('\nYour Settings:\n' + json.dumps(Settings._get_settings_dict(), indent=4) + '\n')
 
-            retry = True if input('Edit these settings [Y/n]? ').lower() == 'y' else False
+            retry = False if input('Use these settings [Y/n]?').lower() == 'y' else True
             subprocess.call(CLEAR_FN, shell=True)
 
         with open(Settings.settings_file_path, 'w', encoding='utf8') as f:
@@ -74,7 +75,7 @@ class Settings:
         for name in IMAGE_HOST_NAMES:
             info = {}
             info['name'] = name
-            info['api_key'] = input(f'Input the API key for {name} (can be blank):')
+            info['api_key'] = input(f'\nInput the API key for {name} (can be blank):')
 
             if info['api_key'] == '' or info['api_key'].strip() == '':
                 info['api_key'] = ''
@@ -89,7 +90,7 @@ class Settings:
     @staticmethod
     def _query_paths():
         Settings.paths = {}
-        Settings.paths['image_save_location'] = input('Input the image save directory: ').strip()
+        Settings.paths['image_save_location'] = input('\nInput the image save directory: ').strip()
         Settings.paths['ffmpeg_bin_path'] = input('Input the full path for the ffmpeg binary: ').strip()
         Settings.paths['mediainfo_bin_path'] = input('Input the full path for the mediainfo binary: ').strip()
 
