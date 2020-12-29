@@ -21,11 +21,124 @@ VOB_EXTS = ('.vob', 'VOB')
 IFO_EXTS = ('.ifo', '.IFO')
 CLEAR_FN = 'cls' if os.name == 'nt' else 'clear'
 
-IMAGE_HOSTS = ['IMGBB', 'PTPIMG']
-SETTINGS_JSON_NAME = 'Release-Info-Creator.json'
+IMAGE_HOST_NAMES = ['ptpimg', 'imgbb']
 
-SETTINGS_KEYS = ['IMGBB_KEY', 'PTPIMG_KEY', 'image_save_location', 'ffmpeg_bin_location', 'mediainfo_bin_location']
-SETTINGS = {}
+# IMAGE_HOSTS = ['IMGBB', 'PTPIMG']
+
+class Settings:
+    settings_file_name = 'Release-Info-Creator.json'
+    settings_file_path = os.path.join( ( os.path.dirname(__file__) ), settings_file_name )
+    image_hosts = []
+    paths = {}
+    preferred_host_name = ''
+
+    @staticmethod
+    def load_settings():
+        try:
+            with open(Settings.settings_file_path, 'r', encoding='utf8') as f:
+                settings = json.load(f)
+            Settings.paths = settings['paths']
+            Settings.image_hosts = settings['image_hosts']
+        except FileNotFoundError:
+            Settings._query_new_settings()
+
+    @staticmethod
+    def load_paths(image_save_location=None, ffmpeg_bin_path=None, mediainfo_bin_path=None):
+        Settings.image_save_location = image_save_location
+        Settings.ffmpeg_bin_path = ffmpeg_bin_path
+        Settings.mediainfo_bin_path = mediainfo_bin_path
+
+    @staticmethod
+    def _query_new_settings():
+        retry = True
+
+        while retry:
+            print(f'Input your settings to be saved into {Settings.settings_file_name}')
+            Settings._query_image_host_info()
+            Settings._query_paths()
+
+            print('\nYour Settings:\n' + json.dumps(Settings._get_settings_dict(), indent=4) + '\n')
+
+            retry = True if input('Edit these settings [Y/n]? ').lower() == 'y' else False
+            subprocess.call(CLEAR_FN, shell=True)
+
+        with open(Settings.settings_file_path, 'w', encoding='utf8') as f:
+            json.dump(Settings._get_settings_dict(), f, indent=4)
+
+    @staticmethod
+    def _query_image_host_info():
+        Settings.image_hosts = []
+        # to check if user has chosen an image host as their default
+        is_set_default = False
+
+        for name in IMAGE_HOST_NAMES:
+            info = {}
+            info['name'] = name
+            info['api_key'] = input(f'Input the API key for {name} (can be blank):')
+
+            if info['api_key'] == '' or info['api_key'].strip() == '':
+                info['api_key'] = ''
+                info['default'] = False
+            elif not is_set_default:
+                info['default'] = True if input(f'Set {name} as the default [Y/n]? ').lower() == 'y' else False
+                if info['default'] == True:
+                    is_set_default = True
+
+            Settings.image_hosts.append(info)
+
+    @staticmethod
+    def _query_paths():
+        Settings.paths = {}
+        Settings.paths['image_save_location'] = input('Input the image save directory: ').strip()
+        Settings.paths['ffmpeg_bin_path'] = input('Input the full path for the ffmpeg binary: ').strip()
+        Settings.paths['mediainfo_bin_path'] = input('Input the full path for the mediainfo binary: ').strip()
+
+    @staticmethod
+    def _get_settings_dict():
+        return { 'paths': Settings.paths, 'image_hosts': Settings.image_hosts }
+
+    @staticmethod
+    def get_preferred_host():
+        default_host_name = Settings._get_default_host()
+        if default_host_name is not None:
+            return default_host_name
+
+        bad_choice_msg = ''
+        max_num = len(IMAGE_HOST_NAMES)
+
+        while True:
+            print(f'{bad_choice_msg}Choose an image host to use: ')
+
+            for i, host_name in enumerate(IMAGE_HOST_NAMES):
+                # will be printed in the console-printed options menu to indicate if the image host key is not set
+                set_str = '    (not set)' if not Settings.get_key(host_name) else ''
+                print(f'  {i + 1}: {host_name}{set_str}')
+
+            choice = input(f'\nYour choice (between {1} and {max_num}): ')
+            if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
+                bad_choice_msg = 'Bad choice. Try again.\n'
+                subprocess.call(CLEAR_FN, shell=True)
+                continue
+            else:
+                return IMAGE_HOST_NAMES[int(choice) - 1]
+
+
+    @staticmethod
+    def _get_default_host():
+        for image_host in Settings.image_hosts:
+            if image_host['default']:
+                return image_host['name']
+        return None
+
+
+    @staticmethod
+    def get_key(host_name):
+        for image_host in Settings.image_hosts:
+            if image_host['name'] == host_name:
+                return image_host['api_key']
+        return None
+
+
 
 class ReleaseInfo:
     def __init__(self, user_set_path):
@@ -44,7 +157,7 @@ class ReleaseInfo:
             base_video_name = os.path.basename(file)
 
             args = '"{mediainfo_bin_location}" "{file}"'.format(
-                mediainfo_bin_location=SETTINGS['mediainfo_bin_location'], 
+                mediainfo_bin_location=Settings.paths['mediainfo_bin_path'], 
                 file=file
                 )
             mediainfo = subprocess.check_output(args, shell=True).decode()
@@ -132,10 +245,10 @@ class ScreenshotGenerator:
             for timestamp in data['timestamps']:
                 now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
                 output_file = f'snapshot_{temp_num} {now}'
-                output_filepath = os.path.join(SETTINGS['image_save_location'], output_file)
+                output_filepath = os.path.join(Settings.paths['image_save_location'], output_file)
 
                 args = r'{ffmpeg_bin_location} -hide_banner -loglevel panic -ss {timestamp} -i "{video_filepath}" -vf "select=gt(scene\,0.01)" {param_DAR} -r 1 -frames:v 1 "{output_filepath}.png"'.format(
-                    ffmpeg_bin_location=SETTINGS['ffmpeg_bin_location'], 
+                    ffmpeg_bin_location=Settings.paths['ffmpeg_bin_path'], 
                     timestamp=timestamp, 
                     video_filepath=video_filepath, 
                     param_DAR=self.param_DAR, 
@@ -184,7 +297,7 @@ class ScreenshotGenerator:
 
         for video_filepath in rls.main_video_files:
             args = '{mediainfo_bin_location} --Output=JSON "{video_filepath}"'.format(
-                mediainfo_bin_location=SETTINGS['mediainfo_bin_location'], 
+                mediainfo_bin_location=Settings.paths['mediainfo_bin_path'], 
                 video_filepath=video_filepath
                 )
             mediainfo_json = subprocess.check_output(args, shell=True).decode()
@@ -203,7 +316,7 @@ class ScreenshotGenerator:
             info_file = rls.main_video_files[0]
 
         args = '{mediainfo_bin_location} --Output=JSON "{info_file}"'.format(
-            mediainfo_bin_location=SETTINGS['mediainfo_bin_location'], 
+            mediainfo_bin_location=Settings.paths['mediainfo_bin_path'], 
             info_file=info_file
             )
         mediainfo_json = subprocess.check_output(args, shell=True).decode()
@@ -245,11 +358,13 @@ class ScreenshotGenerator:
 
 
 class ImageUploader:
-    def __init__(self, images, host=None):
-        assert host is not None, 'Error: No host has been chosen'
-        assert SETTINGS[host + '_KEY'], f'Error: No API key has been set for {host}'
+    def __init__(self, images, host_name=None):
+        assert host_name is not None, 'Error: No image host has been chosen'
 
-        self.host = host
+        self.api_key = Settings.get_key(host_name)
+        assert self.api_key, f'Error: No API key has been set for {host_name}'
+
+        self.host_name = host_name
         self.images = images
         self.image_urls = ''
 
@@ -257,9 +372,9 @@ class ImageUploader:
         return self.image_urls
 
     def upload(self):
-        if self.host == 'PTPIMG':
+        if self.host_name == 'ptpimg':
             self._upload_ptpimg()
-        elif self.host == 'IMGBB':
+        elif self.host_name == 'imgbb':
             self._upload_imgbb()
 
     def _upload_imgbb(self):
@@ -267,7 +382,7 @@ class ImageUploader:
             now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
             with open(image, 'rb') as f:
                 formdata = {
-                    'key': SETTINGS['IMGBB_KEY'], 
+                    'key': self.api_key, 
                     'image': base64.b64encode(f.read()),
                     'name': f'{i}_snapshot {now}'
                 }
@@ -286,7 +401,7 @@ class ImageUploader:
             now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
             image_basename = os.path.basename(image)
             with open(image, 'rb') as f:
-                formdata = {'api_key': SETTINGS['PTPIMG_KEY']}
+                formdata = {'api_key': self.api_key}
                 files = { ('file-upload[0]', (image_basename, f, 'image/png')) }
 
                 resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=formdata)
@@ -298,23 +413,24 @@ class ImageUploader:
 
 
 def main():
-    global SETTINGS
-    SETTINGS = load_settings()
-    preferred_host = get_host_preference()
+    Settings.load_settings()
+    preferred_host = Settings.get_preferred_host()
 
     assert len(sys.argv) > 1, 'Error, need input file'
 
     subprocess.call(CLEAR_FN, shell=True)
+
+    print(f'Image host "{preferred_host}" will be used for uploading\n')
     print('Getting media info(s)')
-    rls = ReleaseInfo(os.path.abspath(sys.argv[1]))
+    rls = ReleaseInfo( os.path.abspath(sys.argv[1]) )
     release_info = rls.get_complete_mediainfo()
 
     print('Generating screenshots')
     screenshot_gen = ScreenshotGenerator(n_images=6)
     images = screenshot_gen.generate_screenshots(rls)
 
-    print('Uploading images')
-    uploader = ImageUploader(images, host=preferred_host)
+    print(f'Uploading images to {preferred_host}')
+    uploader = ImageUploader(images, host_name=preferred_host)
     uploader.upload()
     image_urls = uploader.get_image_urls()
 
@@ -334,99 +450,6 @@ def get_largest_file(files):
             largest_filesize = filesize
 
     return largest_filepath
-
-
-def load_settings():
-    script_dir = os.path.dirname(sys.argv[0])
-    settings_json_location = os.path.join(script_dir, SETTINGS_JSON_NAME)
-
-    try:
-        with open(settings_json_location, 'r', encoding='utf8') as f:
-            settings = json.load(f)
-        if not is_missing_settings(settings):
-            return settings
-        else:
-            return set_missing_settings(settings, settings_json_location)
-    except Exception:
-        return query_new_settings(settings_json_location)
-
-
-def get_host_preference():
-    default_choice = get_default_choice()
-    if default_choice is not None:
-        return default_choice
-
-    bad_choice_msg = ''
-    max_num = len(IMAGE_HOSTS)
-
-    while True:
-        print(f'{bad_choice_msg}Choose an image host to use: ')
-        for i, image_host in enumerate(IMAGE_HOSTS):
-            set_str = '    (not set)' if not SETTINGS[image_host + '_KEY'] else ''
-            print(f'  {i + 1}: {image_host}{set_str}')
-
-        choice = input(f'\nYour choice (between {1} and {max_num}): ')
-        if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
-            bad_choice_msg = 'Bad choice. Try again.\n'
-            subprocess.call(CLEAR_FN, shell=True)
-            continue
-        else:
-            choice = int(choice)
-            return IMAGE_HOSTS[choice - 1]
-
-
-def get_default_choice():
-    last_available_host = ''
-    for image_host in IMAGE_HOSTS:
-        current_key = SETTINGS[image_host + '_KEY']
-        if current_key and last_available_host:
-            return None
-        if current_key:
-            last_available_host = image_host
-    return last_available_host
-
-
-def is_missing_settings(settings):
-    for key in SETTINGS_KEYS:
-        if settings.get(key, None) is None:
-            return True
-    return False
-
-
-def set_missing_settings(settings, settings_json_location):
-    for key in SETTINGS_KEYS:
-        if settings.get(key, None) is None:
-            settings[key] = input(f'Input the missing value for "{key}": ').strip('"')
-
-    with open(settings_json_location, 'w', encoding='utf8') as f:
-        json.dump(settings, f, indent=4)
-
-    subprocess.call(CLEAR_FN, shell=True)
-    return settings
-
-
-def query_new_settings(settings_json_location):
-    settings = {}
-    retry = True
-
-    while retry:
-        print(f'Input your settings to be saved into {SETTINGS_JSON_NAME}')
-        for image_host in IMAGE_HOSTS:
-            key_name = image_host + '_KEY'
-            settings[key_name] = input(f'Input your {image_host} API key (can skip): ')
-
-        settings['image_save_location'] = input('Input the image save directory: ')
-        settings['ffmpeg_bin_location'] = input('Input the full path for the ffmpeg binary: ')
-        settings['mediainfo_bin_location'] = input('Input the full path for the mediainfo binary: ')
-
-        print('\nYour Settings:\n' + json.dumps(settings, indent=4), '\n')
-        retry = True if input('Edit these settings [Y/n]? ').lower() == 'y' else False
-        subprocess.call(CLEAR_FN, shell=True)
-
-    with open(settings_json_location, 'w', encoding='utf8') as f:
-        json.dump(settings, f, indent=4)
-
-    return settings
 
 
 if __name__ == '__main__':
