@@ -136,17 +136,17 @@ class Settings:
 
 
 class ReleaseInfo:
-    def __init__(self, user_set_path):
-        self.user_set_path = user_set_path
+    def __init__(self, input_path):
+        self.input_path = input_path
         self.release_type = ''
-        self.main_ifo_file = ''
+        self.primary_ifo_info = ''
         self.main_video_files = []
         self.media_infos = []
 
     def get_complete_mediainfo(self):
         relevant_files = self._get_relevant_files()
         header = ''
-        if self.release_type == 'dvd': header = '[size=4][b]' + os.path.basename(self.user_set_path) + '[/b][/size]\n\n'
+        if self.release_type == 'dvd': header = '[size=4][b]' + os.path.basename(self.input_path) + '[/b][/size]\n\n'
 
         for file in relevant_files:
             base_video_name = os.path.basename(file)
@@ -165,48 +165,66 @@ class ReleaseInfo:
 
     def _get_relevant_files(self):
         # check if user-set path is of a proper video type
-        if os.path.isfile(self.user_set_path) and self.user_set_path.endswith(VIDEO_FILE_TYPES):
+        if os.path.isfile(self.input_path) and self.input_path.endswith(VIDEO_FILE_TYPES):
             self.release_type = 'single'
-            self.main_video_files.append(self.user_set_path)
-            return [self.user_set_path]
+            self.main_video_files.append(self.input_path)
+            return [self.input_path]
         
-        assert os.path.isdir(self.user_set_path), 'Input path is not a DVD folder or a file of relevant video type: ' + ', '.join(VIDEO_FILE_TYPES)
+        assert os.path.isdir(self.input_path), 'Input path is not a DVD folder or a file of relevant video type: ' + ', '.join(VIDEO_FILE_TYPES)
 
         # check if user-set path contains folder 'VIDEO_TS'
-        if os.path.isdir(os.path.join(self.user_set_path, 'VIDEO_TS')):
+        if os.path.isdir(os.path.join(self.input_path, 'VIDEO_TS')):
             self.release_type = 'dvd'
 
-            dvd_info = DvdAnalyder(self.user_set_path)
-            self.main_ifo_file = dvd_info.get_ifo_file()
+            dvd_info = DvdAnalyder(self.input_path)
+            self.primary_ifo_info = dvd_info.get_primary_ifo_info()
             self.main_video_files = dvd_info.get_main_vob_files()
 
-            return [ self.main_ifo_file, self.main_video_files[0] ]
+            return [ self.primary_ifo_info['path'], self.main_video_files[0] ]
         else:
             self.release_type = 'single'
-            video_files = [os.path.join(self.user_set_path, f) for f in os.listdir(self.user_set_path) if f.endswith(VIDEO_FILE_TYPES)]
+            video_files = [os.path.join(self.input_path, f) for f in os.listdir(self.input_path) if f.endswith(VIDEO_FILE_TYPES)]
             largest_filepath = get_largest_file(video_files)
             self.main_video_files = [largest_filepath]
 
             return [largest_filepath]
 
 class DvdAnalyder:
-    def __init__(self, user_set_path):
-        self.videots_folder_path = os.path.join(user_set_path, 'VIDEO_TS')
+    def __init__(self, input_path):
+        self.videots_folder_path = os.path.join(input_path, 'VIDEO_TS')
 
-    def get_ifo_file(self):
+    def get_primary_ifo_info(self):
+        """
+        Gathers mediainfo on all ifo files. Returns ifo file with longest runtime, which indicates the total runtime of movie
+        :return: file path (str)
+        """
         ifo_files = [os.path.join(self.videots_folder_path, f) for f in os.listdir(self.videots_folder_path) if f.endswith(IFO_EXTS)]
 
-        largest_ifo = ifo_files[0]
-        largest_size = os.path.getsize(largest_ifo)
+        # Preliminary choosing.
+        primary_ifo_file = ifo_files[0]
+        longest_duration = 0
 
-        for ifo in ifo_files:
-            filesize = os.path.getsize(ifo)
-            if filesize > largest_size:
-                largest_ifo = ifo
-                largest_size = filesize
-        return largest_ifo
+        for ifo_file in ifo_files:
+            args = '{mediainfo_bin_location} --Output=JSON "{ifo_file}"'.format(
+                mediainfo_bin_location=Settings.paths['mediainfo_bin_path'],
+                ifo_file=ifo_file
+                )
+            mediainfo_json = subprocess.check_output(args, shell=True).decode()
+            mediainfo_json = json.loads(mediainfo_json)
+
+            for track in mediainfo_json['media']['track']:
+                if track['@type'] == 'General':
+                    if float(track['Duration']) > longest_duration:
+                        longest_duration = float(track['Duration'])
+                        primary_ifo_file = ifo_file
+                    continue
+        return {'path': primary_ifo_file, 'mediainfo_json': mediainfo_json}
 
     def get_main_vob_files(self):
+        """
+        Get primary movie VOB files (ie. largest-size VOB files), which are similar in size
+        :return: file path (str)
+        """
         vob_files = [os.path.join(self.videots_folder_path, f) for f in os.listdir(self.videots_folder_path) if f.endswith(VOB_EXTS)]
         assert len(vob_files) > 0, 'No VOB files found in VIDEO_TS'
 
@@ -305,17 +323,18 @@ class ScreenshotGenerator:
         return main_files_data
 
     def _get_dar(self, rls):
-        if rls.release_type == 'dvd':
-            info_file = rls.main_ifo_file
-        else:
-            info_file = rls.main_video_files[0]
+        mediainfo_json = {}
 
-        args = '{mediainfo_bin_location} --Output=JSON "{info_file}"'.format(
-            mediainfo_bin_location=Settings.paths['mediainfo_bin_path'], 
-            info_file=info_file
-            )
-        mediainfo_json = subprocess.check_output(args, shell=True).decode()
-        mediainfo_json = json.loads(mediainfo_json)
+        if rls.release_type == 'dvd':
+            mediainfo_json = rls.primary_ifo_info['mediainfo_json']
+        else:
+            args = '{mediainfo_bin_location} --Output=JSON "{info_file}"'.format(
+                mediainfo_bin_location=Settings.paths['mediainfo_bin_path'],
+                info_file=rls.main_video_files[0]
+                )
+            mediainfo_json = subprocess.check_output(args, shell=True).decode()
+            mediainfo_json = json.loads(mediainfo_json)
+
         video_info = self._get_video_data(mediainfo_json)
 
         pixel_width = display_width = int(video_info['Width'])
@@ -416,7 +435,7 @@ def main():
     subprocess.run(CLEAR_FN, shell=True)
 
     print(f'Image host "{preferred_host}" will be used for uploading\n')
-    print('Getting media info(s)')
+    print('Gathering media info')
     rls = ReleaseInfo( os.path.abspath(sys.argv[1]) )
     release_info = rls.get_complete_mediainfo()
 
@@ -430,7 +449,7 @@ def main():
     image_urls = uploader.get_image_urls()
 
     pyperclip.copy(release_info + image_urls)
-    print('\nMediainfo(s) + image URLs copied to clipboard')
+    print('\nMediainfo + image URLs copied to clipboard')
     time.sleep(5)
 
 
