@@ -27,7 +27,7 @@ IMAGE_HOST_NAMES = ['ptpimg', 'imgbb']
 
 class Settings:
     settings_file_name = 'Release-Info-Creator.json'
-    settings_file_path = os.path.join( os.path.dirname(__file__), settings_file_name )
+    settings_file_path = os.path.join( os.path.dirname(os.path.abspath(__file__)), settings_file_name )
     image_hosts = []
     paths = {}
     preferred_host_name = ''
@@ -170,7 +170,7 @@ class ReleaseInfo:
             self.main_video_files.append(self.user_set_path)
             return [self.user_set_path]
         
-        assert os.path.isdir(self.user_set_path), 'Input path is not a folder or a file of relevant video type' + ', '.join(VIDEO_FILE_TYPES)
+        assert os.path.isdir(self.user_set_path), 'Input path is not a DVD folder or a file of relevant video type: ' + ', '.join(VIDEO_FILE_TYPES)
 
         # check if user-set path contains folder 'VIDEO_TS'
         if os.path.isdir(os.path.join(self.user_set_path, 'VIDEO_TS')):
