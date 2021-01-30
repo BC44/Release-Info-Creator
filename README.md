@@ -8,6 +8,8 @@ Minimum Python 3.6
 
 `mediainfo` and `ffmpeg` command-line tools
 
+Note: The `mediainfo` CLI tool that is installable via apt/apt-get for linux may not support JSON-formatted console outputs. It's best to install the CLI tool directly from https://mediaarea.net/en/MediaInfo/Download
+
 
 
 ## Setup
