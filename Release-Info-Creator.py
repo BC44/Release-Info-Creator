@@ -21,16 +21,25 @@ VOB_EXTS = ('.vob', 'VOB')
 IFO_EXTS = ('.ifo', '.IFO')
 CLEAR_FN = 'cls' if os.name == 'nt' else 'clear'
 
-IMAGE_HOST_NAMES = ['ptpimg', 'imgbb']
-
-# IMAGE_HOSTS = ['IMGBB', 'PTPIMG']
 
 class Settings:
     settings_file_name = 'Release-Info-Creator.json'
     settings_file_path = os.path.join( os.path.dirname(os.path.abspath(__file__)), settings_file_name )
-    image_hosts = []
     paths = {}
     preferred_host_name = ''
+    image_hosts_skeleton = [
+        {
+            'name': 'ptpimg',
+            'api_key': '',
+            'default': False
+        },
+        {
+            'name': 'imgbb',
+            'api_key': '',
+            'default': False
+        }
+    ]
+    image_hosts = image_hosts_skeleton
 
     @staticmethod
     def load_settings():
@@ -47,7 +56,7 @@ class Settings:
         retry = True
 
         while retry:
-            print(f'Input your settings to be saved into {Settings.settings_file_name}')
+            print(f'\nInput your settings to be saved into {Settings.settings_file_name}')
             Settings._query_image_host_info()
             Settings._query_paths()
 
@@ -62,24 +71,20 @@ class Settings:
 
     @staticmethod
     def _query_image_host_info():
-        Settings.image_hosts = []
+        Settings.image_hosts = Settings.image_hosts_skeleton
         # to check if user has chosen an image host as their default
         is_set_default = False
 
-        for name in IMAGE_HOST_NAMES:
-            info = {}
-            info['name'] = name
-            info['api_key'] = input(f'\nInput the API key for {name} (can be blank):')
+        for i, _ in enumerate(Settings.image_hosts_skeleton):
+            host_name = Settings.image_hosts[i]['name']
+            Settings.image_hosts[i]['api_key'] = input(f'\nInput the API key for {host_name} (can be blank):')
 
-            if info['api_key'] == '' or info['api_key'].strip() == '':
-                info['api_key'] = ''
-                info['default'] = False
-            elif not is_set_default:
-                info['default'] = True if input(f'Set {name} as the default [Y/n]? ').lower() == 'y' else False
-                if info['default'] == True:
+            # Query for default if api key is is given a value
+            if Settings.image_hosts[i]['api_key'].strip() != '' and not is_set_default:
+                Settings.image_hosts[i]['default'] = True if input(
+                    f'Set {host_name} as the default [Y/n]? ').lower() == 'y' else False
+                if Settings.image_hosts[i]['default']:
                     is_set_default = True
-
-            Settings.image_hosts.append(info)
 
     @staticmethod
     def _query_paths():
@@ -92,19 +97,23 @@ class Settings:
     def _get_settings_dict():
         return { 'paths': Settings.paths, 'image_hosts': Settings.image_hosts }
 
+    # Query preferred host from user.
     @staticmethod
     def get_preferred_host():
         default_host_name = Settings._get_default_host()
+        # If image host has 'default' flag set, skip query and use that
         if default_host_name is not None:
             return default_host_name
 
         bad_choice_msg = ''
-        max_num = len(IMAGE_HOST_NAMES)
+        max_num = len(Settings.image_hosts_skeleton)
 
         while True:
             print(f'{bad_choice_msg}Choose an image host to use: ')
 
-            for i, host_name in enumerate(IMAGE_HOST_NAMES):
+            for i, image_host in enumerate(Settings.image_hosts_skeleton):
+                host_name = image_host['name']
+
                 # will be printed in the console-printed options menu to indicate if the image host key is not set
                 set_str = '    (not set)' if not Settings.get_key(host_name) else ''
                 print(f'  {i + 1}: {host_name}{set_str}')
@@ -115,8 +124,7 @@ class Settings:
                 subprocess.run(CLEAR_FN, shell=True)
                 continue
             else:
-                return IMAGE_HOST_NAMES[int(choice) - 1]
-
+                return Settings.image_hosts_skeleton[int(choice) - 1]
 
     @staticmethod
     def _get_default_host():
@@ -125,6 +133,9 @@ class Settings:
                 return image_host['name']
         return None
 
+    @staticmethod
+    def query_options():
+        pass
 
     @staticmethod
     def get_key(host_name):
@@ -132,7 +143,6 @@ class Settings:
             if image_host['name'] == host_name:
                 return image_host['api_key']
         return None
-
 
 
 class ReleaseInfo:
@@ -188,6 +198,7 @@ class ReleaseInfo:
             self.main_video_files = [largest_filepath]
 
             return [largest_filepath]
+
 
 class DvdAnalyder:
     def __init__(self, input_path):
@@ -427,6 +438,9 @@ class ImageUploader:
 
 
 def main():
+    if len(sys.argv) == 1:
+        Settings.query_options()
+        exit()
     Settings.load_settings()
     preferred_host = Settings.get_preferred_host()
 
