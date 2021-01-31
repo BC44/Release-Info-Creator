@@ -468,7 +468,8 @@ class ImageUploader:
         [fd.close() for fd in file_descriptors]
 
     def _upload_hdbimg(self):
-        data = {'username': self.image_host['username'], 'passkey': self.image_host['api_key'], 'galleryoption': 0}
+        # galleryoption == '0' indicates no new gallery will be created
+        data = {'username': self.image_host['username'], 'passkey': self.image_host['api_key'], 'galleryoption': '0'}
         files = {}
 
         file_descriptors = [open(img, 'rb') for img in self.images]
