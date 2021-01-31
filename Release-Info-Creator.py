@@ -15,7 +15,6 @@ from PIL import Image
 ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
 ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
 
-MEDIAINFO_COMPLETE_NAME_RE = r'(Complete name *:).+'
 VIDEO_FILE_TYPES = ('.mkv', '.avi', '.mp4', '.ts')
 VOB_EXTS = ('.vob', 'VOB')
 IFO_EXTS = ('.ifo', '.IFO')
@@ -37,6 +36,17 @@ class Settings:
             'name': 'imgbb',
             'api_key': '',
             'default': False
+        },
+        {
+            'name': 'hdbimg',
+            'username': '',
+            'api_key': '',
+            'default': False
+        },
+        {
+            'name': 'ahdimg',
+            'api_key': '',
+            'default': False
         }
     ]
     image_hosts = image_hosts_skeleton
@@ -48,6 +58,7 @@ class Settings:
                 settings = json.load(f)
             Settings.paths = settings['paths']
             Settings.image_hosts = settings['image_hosts']
+            Settings._append_missing_image_hosts()
         except FileNotFoundError:
             Settings._query_new_settings()
 
@@ -77,7 +88,10 @@ class Settings:
 
         for i, _ in enumerate(Settings.image_hosts_skeleton):
             host_name = Settings.image_hosts[i]['name']
-            Settings.image_hosts[i]['api_key'] = input(f'\nInput the API key for {host_name} (can be blank):')
+            Settings.image_hosts[i]['api_key'] = input(f'\nInput the API key for {host_name} (to skip, leave blank): ')
+
+            if host_name == 'hdbimg':
+                Settings.image_hosts[i]['username'] = input(f'Input your username for {host_name} (to skip, leave blank): ')
 
             # Query for default if api key is is given a value
             if Settings.image_hosts[i]['api_key'].strip() != '' and not is_set_default:
@@ -134,6 +148,20 @@ class Settings:
         return None
 
     @staticmethod
+    def _append_missing_image_hosts():
+        if len(Settings.image_hosts) == len(Settings.image_hosts_skeleton):
+            return
+
+        image_host_names_from_file = [d['name'] for d in Settings.image_hosts]
+
+        for image_host in Settings.image_hosts_skeleton:
+            if image_host['name'] not in image_host_names_from_file:
+                Settings.image_hosts.append(image_host)
+
+        with open(Settings.settings_file_path, 'w', encoding='utf8') as f:
+            json.dump(Settings._get_settings_dict(), f, indent=4)
+
+    @staticmethod
     def query_options():
         pass
 
@@ -146,6 +174,8 @@ class Settings:
 
 
 class ReleaseInfo:
+    mediainfo_complete_name_re = r'(Complete name *:).+'
+
     def __init__(self, input_path):
         self.input_path = input_path
         self.release_type = ''
@@ -166,7 +196,7 @@ class ReleaseInfo:
                 file=file
                 )
             mediainfo = subprocess.check_output(args, shell=True).decode()
-            mediainfo = re.sub(MEDIAINFO_COMPLETE_NAME_RE, fr'\1 {base_video_name}', mediainfo)
+            mediainfo = re.sub(ReleaseInfo.mediainfo_complete_name_re, fr'\1 {base_video_name}', mediainfo)
             mediainfo = mediainfo.replace('\r\n', '\n')
 
             self.media_infos.append('[mediainfo]\n' + mediainfo.strip() + '\n[/mediainfo]\n\n')
