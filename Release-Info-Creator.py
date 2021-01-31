@@ -166,11 +166,11 @@ class Settings:
         pass
 
     @staticmethod
-    def get_key(host_name):
-        for image_host in Settings.image_hosts:
+    def get_image_host_index(host_name):
+        for i, image_host in enumerate(Settings.image_hosts):
             if image_host['name'] == host_name:
-                return image_host['api_key']
-        return None
+                return i
+        return -1
 
 
 class ReleaseInfo:
@@ -416,10 +416,8 @@ class ImageUploader:
     def __init__(self, images, host_name=None):
         assert host_name is not None, 'Error: No image host has been chosen'
 
-        self.api_key = Settings.get_key(host_name)
-        assert self.api_key, f'Error: No API key has been set for {host_name}'
-
-        self.host_name = host_name
+        image_host_id = Settings.get_image_host_index(host_name)
+        self.image_host = Settings.image_hosts[image_host_id]
         self.images = images
         self.image_urls = ''
 
@@ -427,10 +425,12 @@ class ImageUploader:
         return self.image_urls
 
     def upload(self):
-        if self.host_name == 'ptpimg':
+        if self.image_host['name'] == 'ptpimg':
             self._upload_ptpimg()
-        elif self.host_name == 'imgbb':
+        elif self.image_host['name'] == 'imgbb':
             self._upload_imgbb()
+        elif self.image_host['name'] == 'hdbimg':
+            self._upload_hdbimg()
 
     def _upload_imgbb(self):
         for i, image in enumerate(self.images):
@@ -452,19 +452,32 @@ class ImageUploader:
             self.image_urls += direct_url + '\n'
 
     def _upload_ptpimg(self):
-        for i, image in enumerate(self.images):
-            now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
-            image_basename = os.path.basename(image)
-            with open(image, 'rb') as f:
-                formdata = {'api_key': self.api_key}
-                files = { ('file-upload[0]', (image_basename, f, 'image/png')) }
+        data = {'api_key': self.image_host['api_key']}
+        files = {}
 
-                resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=formdata)
-                resp = json.loads(resp.text)
+        file_descriptors = [open(img, 'rb') for img in self.images]
+        for i, fd in enumerate(file_descriptors):
+            # ptpimg does not retain filenames
+            files[ f'file-upload[{i}]' ] = ('potatoes_boilem_mashem_ptpimg_dont_care', fd)
 
-                image_id = resp[0]['code']
-                direct_url = f'https://ptpimg.me/{image_id}.png'
-                self.image_urls += direct_url + '\n'
+        resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=data)
+        resp_json = resp.json()
+
+        image_urls = ['https://ptpimg.me/{}.png'.format(img['code']) for img in resp_json]
+        self.image_urls = '\n'.join(image_urls) + '\n'
+        [fd.close() for fd in file_descriptors]
+
+    def _upload_hdbimg(self):
+        data = {'username': self.image_host['username'], 'passkey': self.image_host['api_key'], 'galleryoption': 0}
+        files = {}
+
+        file_descriptors = [open(img, 'rb') for img in self.images]
+        for i, fd in enumerate(file_descriptors):
+            files[f'images_files[{i}]'] = (os.path.basename(self.images[i]), fd)
+
+        resp = requests.post(url=ENDPOINT_HDBIMG, files=files, data=data)
+        self.image_urls = resp.text
+        [fd.close() for fd in file_descriptors]
 
 
 def main():
@@ -493,7 +506,7 @@ def main():
     image_urls = uploader.get_image_urls()
 
     pyperclip.copy(release_info + image_urls)
-    print('\nMediainfo + image URLs copied to clipboard')
+    print('\nMediainfo + image URLs have been copied to clipboard')
     time.sleep(5)
 
 
