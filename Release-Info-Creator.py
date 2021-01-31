@@ -12,8 +12,9 @@ import sys
 import time
 from PIL import Image
 
-ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
 ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
+ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
+ENDPOINT_HDBIMG = 'https://img.hdbits.org/upload_api.php'
 
 VIDEO_FILE_TYPES = ('.mkv', '.avi', '.mp4', '.ts')
 VOB_EXTS = ('.vob', 'VOB')
