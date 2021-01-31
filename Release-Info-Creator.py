@@ -120,16 +120,16 @@ class Settings:
             return default_host_name
 
         bad_choice_msg = ''
-        max_num = len(Settings.image_hosts_skeleton)
+        max_num = len(Settings.image_hosts)
 
         while True:
             print(f'{bad_choice_msg}Choose an image host to use: ')
 
-            for i, image_host in enumerate(Settings.image_hosts_skeleton):
+            for i, image_host in enumerate(Settings.image_hosts):
                 host_name = image_host['name']
 
                 # will be printed in the console-printed options menu to indicate if the image host key is not set
-                set_str = '    (not set)' if not Settings.get_key(host_name) else ''
+                set_str = '    (not set)' if image_host['api_key'].strip() == '' else ''
                 print(f'  {i + 1}: {host_name}{set_str}')
 
             choice = input(f'\nYour choice (between {1} and {max_num}): ')
