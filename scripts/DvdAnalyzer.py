@@ -5,7 +5,7 @@ import subprocess
 import Helper
 from Settings import Settings
 
-VOB_EXTS = ('.vob', 'VOB')
+VOB_EXTS = ('.vob', '.VOB')
 IFO_EXTS = ('.ifo', '.IFO')
 
 
