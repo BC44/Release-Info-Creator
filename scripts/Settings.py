@@ -6,7 +6,7 @@ CLEAR_FN = 'cls' if os.name == 'nt' else 'clear'
 
 
 class Settings:
-    settings_file_name = 'Release-Info-Creator.json'
+    settings_file_name = 'ReleaseInfoCreator.json'
     settings_file_path = os.path.join( os.path.dirname(os.path.abspath(__file__)), settings_file_name )
     paths = {}
     preferred_host_name = ''
