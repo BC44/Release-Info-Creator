@@ -485,7 +485,7 @@ def main():
         exit()
     Settings.load_settings()
     image_host_id = Settings.get_preferred_host()
-    image_host_name = Settings.image_hosts[image_host_id]['name'];exit()
+    image_host_name = Settings.image_hosts[image_host_id]['name']
 
     assert len(sys.argv) > 1, 'Error, need input file'
 
