@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 
+import Helper
 from Settings import Settings
 from DvdAnalyzer import DvdAnalyzer
 
