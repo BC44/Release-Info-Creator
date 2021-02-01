@@ -125,7 +125,7 @@ class Settings:
         max_num = len(Settings.image_hosts)
 
         while True:
-            print(f'{bad_choice_msg}Choose an image host to use: ')
+            print(f'\n{bad_choice_msg}Choose an image host to use: \n')
 
             for i, image_host in enumerate(Settings.image_hosts):
                 host_name = image_host['name']
@@ -137,6 +137,10 @@ class Settings:
             choice = input(f'\nYour choice (between {1} and {max_num}): ')
             if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
                 bad_choice_msg = 'Bad choice. Try again.\n'
+                subprocess.run(CLEAR_FN, shell=True)
+                continue
+            elif Settings.image_hosts[ int(choice) - 1 ]['api_key'].strip() == '':
+                bad_choice_msg = f'Your chosen image host ({choice}) has not been set.\n'
                 subprocess.run(CLEAR_FN, shell=True)
                 continue
             else:
@@ -481,7 +485,7 @@ def main():
         exit()
     Settings.load_settings()
     image_host_id = Settings.get_preferred_host()
-    image_host_name = Settings.image_hosts[image_host_id]['name']
+    image_host_name = Settings.image_hosts[image_host_id]['name'];exit()
 
     assert len(sys.argv) > 1, 'Error, need input file'
 
