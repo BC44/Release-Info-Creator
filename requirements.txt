@@ -1,3 +1,4 @@
+guessit
 requests
 pyperclip
 Pillow
