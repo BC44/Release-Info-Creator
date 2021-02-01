@@ -21,7 +21,8 @@ class ReleaseInfo:
     def get_complete_mediainfo(self):
         relevant_files = self._get_relevant_files()
         header = ''
-        if self.release_type == 'dvd': header = '[size=4][b]' + os.path.basename(self.input_path) + '[/b][/size]\n\n'
+        if self.release_type == 'dvd':
+            header = '[size=4][b]' + os.path.basename(self.input_path) + '[/b][/size]\n\n'
 
         for file in relevant_files:
             base_video_name = os.path.basename(file)

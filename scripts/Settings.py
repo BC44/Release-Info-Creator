@@ -47,6 +47,15 @@ class Settings:
             Settings._query_new_settings()
 
     @staticmethod
+    def assert_paths():
+        assert os.path.isdir(Settings.paths['image_save_location']), \
+            'ERROR: Image save directory does not exist: {}'.format(Settings.paths['image_save_location'])
+        assert os.path.isfile(Settings.paths['ffmpeg_bin_path']), \
+            'ERROR: FFmpeg file does not exist: {}'.format(Settings.paths['ffmpeg_bin_path'])
+        assert os.path.isfile(Settings.paths['mediainfo_bin_path']), \
+            'ERROR: Mediainfo file does not exist: {}'.format(Settings.paths['mediainfo_bin_path'])
+
+    @staticmethod
     def _query_new_settings():
         retry = True
 

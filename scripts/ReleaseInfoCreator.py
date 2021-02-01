@@ -21,6 +21,7 @@ def main():
         Settings.query_options()
         exit()
     Settings.load_settings()
+    Settings.assert_paths()
     image_host_id = Settings.get_preferred_host()
     image_host_name = Settings.image_hosts[image_host_id]['name']
 
