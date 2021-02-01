@@ -283,14 +283,16 @@ class DvdAnalyder:
 class ScreenshotGenerator:
     def __init__(self, n_images=6):
         self.n_images = n_images
+        self.display_width = 0
+        self.display_height = 0
         self.param_DAR = ''
         
     def generate_screenshots(self, rls):
         saved_images = []
         timestamp_data = self._get_timestamp_data(rls)
 
-        display_aspect_ratio = self._get_dar(rls)
-        self.param_DAR = f'-vf "scale={display_aspect_ratio}"'
+        self.display_width, self.display_height = self._get_display_dimensions(rls)
+        self.param_DAR = f'-vf "scale={self.display_width}:{self.display_height}"'
 
         temp_num = 0
         for data in timestamp_data:
@@ -362,7 +364,7 @@ class ScreenshotGenerator:
 
         return main_files_data
 
-    def _get_dar(self, rls):
+    def _get_display_dimensions(self, rls):
         mediainfo_json = {}
 
         if rls.release_type == 'dvd':
@@ -380,7 +382,7 @@ class ScreenshotGenerator:
         pixel_width = display_width = int(video_info['Width'])
         pixel_height = display_height = int(video_info['Height'])
         if float(video_info['PixelAspectRatio']) == 1:
-            return f'{pixel_width}:{pixel_height}'
+            return (pixel_width, pixel_height)
 
         dar_float = float(video_info['DisplayAspectRatio'])
         temp_display_width = round(pixel_height * dar_float)
@@ -389,7 +391,7 @@ class ScreenshotGenerator:
         else:
             display_height = round(pixel_width / dar_float)
 
-        return f'{display_width}:{display_height}'
+        return (display_width, display_height)
 
     def _keep_n_largest(self, saved_images):
         for i, _ in enumerate(saved_images):
@@ -466,8 +468,10 @@ class ImageUploader:
         [fd.close() for fd in file_descriptors]
 
     def _upload_hdbimg(self):
+        gallery_name = get_gallery_name(sys.argv[1])
         # galleryoption == '0' indicates no new gallery will be created
-        data = {'username': self.image_host['username'], 'passkey': self.image_host['api_key'], 'galleryoption': '0'}
+        # galleryoption == '1' indicates new gallery will be created
+        data = {'username': self.image_host['username'], 'passkey': self.image_host['api_key'], 'galleryoption': '1', 'galleryname': gallery_name}
         files = {}
 
         file_descriptors = [open(img, 'rb') for img in self.images]
@@ -508,6 +512,20 @@ def main():
     pyperclip.copy(release_info + image_urls)
     print('\nMediainfo + image URLs have been copied to clipboard')
     time.sleep(5)
+
+
+def get_gallery_name(input_path):
+    from guessit import guessit
+
+    guessed_data = guessit(input_path)
+    gallery_name = guessed_data['title']
+    if guessed_data.get('year', None) is not None:
+        gallery_name += ' ({year})'.format(year=guessed_data['year'])
+
+    if guessed_data.get('screen_size', None) is not None:
+        gallery_name += ' - {res}'.format(res=guessed_data['screen_size'])
+
+    return gallery_name
 
 
 def get_largest_file(files):
