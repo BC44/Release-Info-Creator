@@ -15,6 +15,7 @@ from PIL import Image
 ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
 ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
 ENDPOINT_HDBIMG = 'https://img.hdbits.org/upload_api.php'
+ENDPOINT_AHDIMG = 'https://img.awesome-hd.me/api/upload'
 
 VIDEO_FILE_TYPES = ('.mkv', '.avi', '.mp4', '.ts')
 VOB_EXTS = ('.vob', 'VOB')
@@ -112,13 +113,13 @@ class Settings:
     def _get_settings_dict():
         return { 'paths': Settings.paths, 'image_hosts': Settings.image_hosts }
 
-    # Query preferred host from user.
+    # Query preferred host from user. Returns index number of host in list
     @staticmethod
     def get_preferred_host():
-        default_host_name = Settings._get_default_host()
+        default_host_index = Settings._get_default_host()
         # If image host has 'default' flag set, skip query and use that
-        if default_host_name is not None:
-            return default_host_name
+        if default_host_index != -1:
+            return default_host_index
 
         bad_choice_msg = ''
         max_num = len(Settings.image_hosts)
@@ -139,14 +140,14 @@ class Settings:
                 subprocess.run(CLEAR_FN, shell=True)
                 continue
             else:
-                return Settings.image_hosts_skeleton[int(choice) - 1]
+                return int(choice) - 1
 
     @staticmethod
     def _get_default_host():
-        for image_host in Settings.image_hosts:
+        for i, image_host in enumerate(Settings.image_hosts):
             if image_host['default']:
-                return image_host['name']
-        return None
+                return i
+        return -1
 
     @staticmethod
     def _append_missing_image_hosts():
@@ -165,13 +166,6 @@ class Settings:
     @staticmethod
     def query_options():
         pass
-
-    @staticmethod
-    def get_image_host_index(host_name):
-        for i, image_host in enumerate(Settings.image_hosts):
-            if image_host['name'] == host_name:
-                return i
-        return -1
 
 
 class ReleaseInfo:
@@ -414,10 +408,9 @@ class ScreenshotGenerator:
 
 
 class ImageUploader:
-    def __init__(self, images, host_name=None):
-        assert host_name is not None, 'Error: No image host has been chosen'
+    def __init__(self, images, image_host_id=-1):
+        assert image_host_id != -1, 'Error: No image host has been chosen'
 
-        image_host_id = Settings.get_image_host_index(host_name)
         self.image_host = Settings.image_hosts[image_host_id]
         self.images = images
         self.image_urls = ''
@@ -438,7 +431,7 @@ class ImageUploader:
             now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
             with open(image, 'rb') as f:
                 formdata = {
-                    'key': self.api_key, 
+                    'key': self.image_host['api_key'],
                     'image': base64.b64encode(f.read()),
                     'name': f'{i}_snapshot {now}'
                 }
@@ -487,13 +480,14 @@ def main():
         Settings.query_options()
         exit()
     Settings.load_settings()
-    preferred_host = Settings.get_preferred_host()
+    image_host_id = Settings.get_preferred_host()
+    image_host_name = Settings.image_hosts[image_host_id]['name']
 
     assert len(sys.argv) > 1, 'Error, need input file'
 
     subprocess.run(CLEAR_FN, shell=True)
 
-    print(f'Image host "{preferred_host}" will be used for uploading\n')
+    print( 'Image host "{}" will be used for uploading\n'.format(image_host_name) )
     print('Gathering media info')
     rls = ReleaseInfo( os.path.abspath(sys.argv[1]) )
     release_info = rls.get_complete_mediainfo()
@@ -502,8 +496,8 @@ def main():
     screenshot_gen = ScreenshotGenerator(n_images=6)
     images = screenshot_gen.generate_screenshots(rls)
 
-    print(f'Uploading images to {preferred_host}')
-    uploader = ImageUploader(images, host_name=preferred_host)
+    print( 'Uploading images to {}'.format(image_host_name) )
+    uploader = ImageUploader(images, image_host_id=image_host_id)
     uploader.upload()
     image_urls = uploader.get_image_urls()
 
