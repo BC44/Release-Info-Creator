@@ -9,7 +9,6 @@ import time
 import Helper
 from Settings import Settings
 from ReleaseInfo import ReleaseInfo
-from DvdAnalyzer import DvdAnalyzer
 from ScreenshotGenerator import ScreenshotGenerator
 from ImageUploader import ImageUploader
 
@@ -20,8 +19,10 @@ def main():
     if len(sys.argv) == 1:
         Settings.query_options()
         exit()
+
     Settings.load_settings()
     Settings.assert_paths()
+
     image_host_id = Settings.get_preferred_host()
     image_host_name = Settings.image_hosts[image_host_id]['name']
 
@@ -44,9 +45,13 @@ def main():
     uploader.upload()
     image_urls = uploader.get_image_urls()
 
-    pyperclip.copy(release_info + image_urls)
-    print('\nMediainfo + image URLs have been copied to clipboard')
-    time.sleep(5)
+    if Settings.print_not_copy:
+        subprocess.run(CLEAR_FN, shell=True)
+        print(release_info + image_urls)
+    else:
+        pyperclip.copy(release_info + image_urls)
+        print('\nMediainfo + image URLs have been copied to clipboard')
+        time.sleep(5)
 
 
 if __name__ == '__main__':

@@ -37,7 +37,7 @@ class DvdAnalyzer:
 
             for track in mediainfo_json['media']['track']:
                 if track['@type'] == 'General':
-                    if track.get('Duration', None) is None:
+                    if track.get('Duration') is None:
                         continue
                     if float(track['Duration']) > longest_duration:
                         longest_duration = float(track['Duration'])
