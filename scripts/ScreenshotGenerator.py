@@ -29,7 +29,7 @@ class ScreenshotGenerator:
                 output_file = f'snapshot_{temp_num} {now}'
                 output_filepath = os.path.join(Settings.paths['image_save_location'], output_file)
 
-                args = r'{ffmpeg_bin_location} -hide_banner -loglevel panic -ss {timestamp} -i "{video_filepath}" ' \
+                args = r'"{ffmpeg_bin_location}" -hide_banner -loglevel panic -ss {timestamp} -i "{video_filepath}" ' \
                        r'-vf "select=gt(scene\,0.01)" {param_DAR} -r 1 -frames:v 1 "{output_filepath}.png"'.format(
                     ffmpeg_bin_location=Settings.paths['ffmpeg_bin_path'],
                     timestamp=timestamp,
@@ -79,7 +79,7 @@ class ScreenshotGenerator:
         }
 
         for video_filepath in rls.main_video_files:
-            args = '{mediainfo_bin_location} --Output=JSON "{video_filepath}"'.format(
+            args = '"{mediainfo_bin_location}" --Output=JSON "{video_filepath}"'.format(
                 mediainfo_bin_location=Settings.paths['mediainfo_bin_path'],
                 video_filepath=video_filepath
             )
@@ -98,7 +98,7 @@ class ScreenshotGenerator:
         if rls.release_type == 'dvd':
             mediainfo_json = rls.primary_ifo_info['mediainfo_json']
         else:
-            args = '{mediainfo_bin_location} --Output=JSON "{info_file}"'.format(
+            args = '"{mediainfo_bin_location}" --Output=JSON "{info_file}"'.format(
                 mediainfo_bin_location=Settings.paths['mediainfo_bin_path'],
                 info_file=rls.main_video_files[0]
             )
@@ -110,7 +110,7 @@ class ScreenshotGenerator:
         pixel_width = display_width = int(video_info['Width'])
         pixel_height = display_height = int(video_info['Height'])
         if float(video_info['PixelAspectRatio']) == 1:
-            return (pixel_width, pixel_height)
+            return pixel_width, pixel_height
 
         dar_float = float(video_info['DisplayAspectRatio'])
         temp_display_width = round(pixel_height * dar_float)
@@ -119,7 +119,7 @@ class ScreenshotGenerator:
         else:
             display_height = round(pixel_width / dar_float)
 
-        return (display_width, display_height)
+        return display_width, display_height
 
     def _keep_n_largest(self, saved_images):
         for i, _ in enumerate(saved_images):

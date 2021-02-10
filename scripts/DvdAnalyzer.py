@@ -28,7 +28,7 @@ class DvdAnalyzer:
         longest_duration = 0
 
         for ifo_file in ifo_files:
-            args = '{mediainfo_bin_location} --Output=JSON "{ifo_file}"'.format(
+            args = '"{mediainfo_bin_location}" --Output=JSON "{ifo_file}"'.format(
                 mediainfo_bin_location=Settings.paths['mediainfo_bin_path'],
                 ifo_file=ifo_file
                 )

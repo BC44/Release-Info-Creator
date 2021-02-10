@@ -31,6 +31,7 @@ class ImageUploader:
             self._upload_hdbimg()
         elif self.image_host['name'] == 'ahdimg':
             print('Error: ahdimg is not yet implemented on this script. Site currently down for testing.')
+            exit()
 
     def _upload_imgbb(self):
         for i, image in enumerate(self.images):

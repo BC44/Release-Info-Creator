@@ -36,7 +36,7 @@ def main():
     release_info = rls.get_complete_mediainfo()
 
     print('Generating screenshots')
-    screenshot_gen = ScreenshotGenerator(n_images=6)
+    screenshot_gen = ScreenshotGenerator()
     images = screenshot_gen.generate_screenshots(rls)
 
     print( 'Uploading images to {}'.format(image_host_name) )
