@@ -43,6 +43,7 @@ class Settings:
             with open(Settings.settings_file_path, 'r', encoding='utf8') as f:
                 settings = json.load(f)
             Settings.paths = settings['paths']
+            Settings._expand_paths()
             Settings.image_hosts = settings['image_hosts']
             Settings.print_not_copy = settings.get('print_not_copy')
             Settings._append_missing_settings()
@@ -80,6 +81,11 @@ class Settings:
 
         with open(Settings.settings_file_path, 'w', encoding='utf8') as f:
             json.dump(Settings._get_settings_dict(), f, indent=4)
+
+    @staticmethod
+    def _expand_paths():
+        for path_name in Settings.paths:
+            Settings.paths[path_name] = os.path.expanduser( Settings.paths[path_name] )
 
     @staticmethod
     def _query_image_host_info():
