@@ -3,6 +3,7 @@ import datetime
 import requests
 import os
 
+from string import Template
 from Settings import Settings
 
 ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
@@ -12,6 +13,8 @@ ENDPOINT_AHDIMG = 'https://img.awesome-hd.me/api/upload'
 
 
 class ImageUploader:
+    img_url_template = Template('[url=$direct_url][img]$thumb_url[/img][/url]')
+
     def __init__(self, images, gallery_name, image_host_id=-1):
         assert image_host_id != -1, 'Error: No image host has been chosen'
 
@@ -42,12 +45,19 @@ class ImageUploader:
                     'image': base64.b64encode(f.read()),
                     'name': f'{i}_snapshot {now}'
                 }
-
                 resp = requests.post(url=ENDPOINT_IMGBB, data=formdata)
-            resp_json = resp.json()
 
-            direct_url = resp_json['data']['url']
-            self.image_urls += direct_url + '\n'
+            resp_json = resp.json()
+            direct_url = resp_json['data']['image']['url']
+            thumb_url = resp_json['data']['medium']['url']
+
+            if Settings.use_bbcode_tags:
+                self.image_urls += self.img_url_template.safe_substitute(
+                    direct_url=direct_url,
+                    thumb_url=thumb_url
+                ) + '\n'
+            else:
+                self.image_urls += direct_url + '\n'
 
     def _upload_ptpimg(self):
         data = {'api_key': self.image_host['api_key']}
