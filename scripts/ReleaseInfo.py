@@ -35,7 +35,7 @@ class ReleaseInfo:
             mediainfo = re.sub(ReleaseInfo.mediainfo_complete_name_re, fr'\1 {base_video_name}', mediainfo)
             mediainfo = mediainfo.replace('\r\n', '\n')
 
-            self.media_infos.append('[mediainfo]\n' + mediainfo.strip() + '\n[/mediainfo]\n\n')
+            self.media_infos.append(mediainfo.strip() + '\n\n')
 
         return header + ''.join(self.media_infos)
 
