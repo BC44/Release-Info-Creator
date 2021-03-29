@@ -14,6 +14,8 @@ ENDPOINT_AHDIMG = 'https://img.awesome-hd.me/api/upload'
 
 class ImageUploader:
     img_url_template = Template('[url=$direct_url][img]$thumb_url[/img][/url]')
+    # basic tagging for the image hosts that don't provide thumb urls
+    basic_img_url_template = Template('[img]$direct_url[/img]')
 
     def __init__(self, images, gallery_name, image_host_id=-1):
         assert image_host_id != -1, 'Error: No image host has been chosen'
@@ -72,7 +74,14 @@ class ImageUploader:
         resp_json = resp.json()
 
         image_urls = ['https://ptpimg.me/{}.png'.format(img['code']) for img in resp_json]
-        self.image_urls = '\n'.join(image_urls) + '\n'
+
+        for direct_url in image_urls:
+            if Settings.use_bbcode_tags:
+                self.image_urls += self.basic_img_url_template.safe_substitute(
+                    direct_url=direct_url
+                ) + '\n'
+            else:
+                self.image_urls += direct_url + '\n'
         [fd.close() for fd in file_descriptors]
 
     def _upload_hdbimg(self):
@@ -91,5 +100,7 @@ class ImageUploader:
             files[f'images_files[{i}]'] = (os.path.basename(self.images[i]), fd)
 
         resp = requests.post(url=ENDPOINT_HDBIMG, files=files, data=data)
+
+        # image urls come pre-formatted for use within hdbits
         self.image_urls = resp.text
         [fd.close() for fd in file_descriptors]

@@ -129,7 +129,7 @@ class Settings:
     @staticmethod
     def _query_bbcode_tags():
         Settings.use_bbcode_tags = True if \
-            input('\nUse bbcode tags ([url=][img][/img][/url]) for '
+            input('\nUse [img][/img] bbcode tags for '
                   'image urls [Y/n]? ').lower().strip() == 'y' else False
 
     @staticmethod
