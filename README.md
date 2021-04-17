@@ -23,7 +23,7 @@ Run the script as indicated below. If no config `.json` file exists, a first-run
 
 ## Usage
 
-> Detects `*.ifo` file in the same directory and gathers mediainfo from it as well
+> Will also detect the correct `*.ifo` file from DVD folder
 
     py ReleaseInfoCreator.py "DVD_main_folder"
 
