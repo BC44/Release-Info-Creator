@@ -49,6 +49,7 @@ class ImageUploader:
                 }
                 resp = requests.post(url=ENDPOINT_IMGBB, data=formdata)
 
+            assert resp.ok, f'IMGBB returned status code {resp.status_code}'
             resp_json = resp.json()
             direct_url = resp_json['data']['image']['url']
             thumb_url = resp_json['data']['medium']['url']
@@ -71,6 +72,7 @@ class ImageUploader:
             files[ f'file-upload[{i}]' ] = ('potatoes_boilem_mashem_ptpimg_dont_care', fd)
 
         resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=data)
+        assert resp.ok, f'PTPIMG returned status code {resp.status_code}'
         resp_json = resp.json()
 
         image_urls = ['https://ptpimg.me/{}.png'.format(img['code']) for img in resp_json]
@@ -100,6 +102,7 @@ class ImageUploader:
             files[f'images_files[{i}]'] = (os.path.basename(self.images[i]), fd)
 
         resp = requests.post(url=ENDPOINT_HDBIMG, files=files, data=data)
+        assert resp.ok, f'HDBIMG returned status code {resp.status_code}'
 
         # image urls come pre-formatted for use within hdbits
         self.image_urls = resp.text
