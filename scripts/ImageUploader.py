@@ -6,7 +6,7 @@ import os
 from string import Template
 from Settings import Settings
 
-ENDPOINT_PTPIMG = 'http://ptpimg.me/upload.php'
+ENDPOINT_PTPIMG = 'https://ptpimg.me/upload.php'
 ENDPOINT_IMGBB = 'https://api.imgbb.com/1/upload'
 ENDPOINT_HDBIMG = 'https://img.hdbits.org/upload_api.php'
 ENDPOINT_AHDIMG = 'https://img.awesome-hd.me/api/upload'
