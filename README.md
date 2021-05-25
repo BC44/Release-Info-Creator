@@ -4,6 +4,8 @@ Generates mediainfo and screenshots automatically given a video file, uploads th
 
 
 ## Requirements
+Minimum Python 3.6
+
 `mediainfo` and `ffmpeg` command-line tools
 
 Note: The `mediainfo` CLI tool that is installable via apt/apt-get for linux may not support JSON-formatted console outputs. To check, invoke MediaInfo manually via a terminal: `MediaInfo --Output=JSON "video_file.mkv"`. 

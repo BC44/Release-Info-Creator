@@ -55,18 +55,11 @@ class Settings:
             Settings._append_missing_settings(settings_from_file)
             Settings._expand_paths()
         except FileNotFoundError:
-            print(
-                '\nExisting settings file not found, a new one will be created and saved as {file_name}'.format(
-                    file_name=Settings.settings_file_name
-                )
-            )
+            print(f'\nExisting settings file not found, a new one will be created '
+                  f'and saved as {Settings.settings_file_name}')
             Settings._query_new_settings()
         except json.decoder.JSONDecodeError:
-            print(
-                'Error reading from {file_path} (bad formatting?). Querying for new settings...'.format(
-                    file_path=Settings.settings_file_path
-                )
-            )
+            print(f'Error reading from {Settings.settings_file_path} (bad formatting?). Querying for new settings...')
             Settings._query_new_settings()
 
     @staticmethod
@@ -160,20 +153,14 @@ class Settings:
         max_num = len(Settings.image_hosts)
 
         while True:
-            print( '\n{0}Choose an image host to use: \n'.format(bad_choice_msg) )
+            print(f'\n{bad_choice_msg}Choose an image host to use: \n')
 
             for i, image_host in enumerate(Settings.image_hosts):
                 host_name = image_host['name']
 
                 # will be printed in the console-printed options menu to indicate if the image host key is not set
                 set_str = '    (not set)' if image_host['api_key'].strip() == '' else ''
-                print(
-                    '  {num}: {host_name}{set_str}'.format(
-                        num=i + 1,
-                        host_name=host_name,
-                        set_str=set_str
-                    )
-                )
+                print(f'  {i + 1}: {host_name}{set_str}')
 
             choice = input(f'\nYour choice (between {1} and {max_num}): ')
             if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
