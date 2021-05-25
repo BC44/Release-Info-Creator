@@ -23,6 +23,8 @@ Run the script as indicated below. If no config `.json` file exists, a first-run
 
 ## Usage
 
+If on linux/mac, use `python3` instead of `py`
+
 > Will also detect the correct `*.ifo` file from DVD folder
 
     py ReleaseInfoCreator.py "DVD_main_folder"
