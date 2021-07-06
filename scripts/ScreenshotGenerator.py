@@ -122,6 +122,12 @@ class ScreenshotGenerator:
         return display_width, display_height
 
     def _keep_n_largest(self, saved_images):
+        """
+        # Smallest JPG files will contain the least detail - the 2 smallest will be discarded.
+        # This will keep the largest JPG files' respective PNG files (from which they were compressed), and upload them
+        :param saved_images: (list) of file paths (str)
+        :return: (list) of file paths (str)
+        """
         for i, _ in enumerate(saved_images):
             for k in range(i + 1, len(saved_images)):
                 if saved_images[i]['size'] < saved_images[k]['size']:

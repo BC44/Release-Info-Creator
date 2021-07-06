@@ -87,7 +87,8 @@ class ImageUploader:
         [fd.close() for fd in file_descriptors]
 
     def _upload_hdbimg(self):
-        # galleryoption == '0' indicates no new gallery will be created
+        # galleryoption == '0' indicates no new gallery will be created; value not honored; new gallery is
+        # created regardless
         # galleryoption == '1' indicates new gallery will be created
         data = {
             'username': self.image_host['username'],
