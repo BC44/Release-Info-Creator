@@ -8,7 +8,7 @@ Minimum Python 3.6
 
 `mediainfo` and `ffmpeg` command-line tools
 
-Note: The `mediainfo` CLI tool that is installable via apt/apt-get for linux may not support JSON-formatted console outputs. To check, invoke MediaInfo manually via a terminal: `MediaInfo --Output=JSON "video_file.mkv"`. 
+Note: The `mediainfo` CLI tool that is installable via apt/apt-get for linux may not support JSON-formatted console outputs. To check, invoke MediaInfo manually via a terminal: `mediainfo --Output=JSON "video_file.mkv"`. 
 
 If it doesn't output the mediainfo in a JSON format, then you'll need to install the CLI tool directly from https://mediaarea.net/en/MediaInfo/Download
 
