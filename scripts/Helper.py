@@ -1,7 +1,12 @@
 import os
 
 
-def get_largest_file(files):
+def get_largest_file(files: list) -> str:
+    """
+    Determines the largest file from a list of paths
+    :param files (list<str>): file paths
+    :return str:
+    """
     largest_filepath = files[0]
     largest_filesize = os.path.getsize(files[0])
 
@@ -14,7 +19,12 @@ def get_largest_file(files):
     return largest_filepath
 
 
-def get_gallery_name(input_path):
+def get_gallery_name(input_path: str) -> str:
+    """
+    Determines movie name based on the filename, as well as year if applicable
+    :param input_path (str): file path of video file
+    :return (str): Name to use for gallery (for video hosts that have the option of creating a gallery)
+    """
     from guessit import guessit
 
     guessed_data = guessit(input_path)

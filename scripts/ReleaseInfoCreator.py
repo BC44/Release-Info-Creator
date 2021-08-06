@@ -21,7 +21,6 @@ def main():
         exit()
 
     Settings.load_settings()
-    Settings.assert_paths()
 
     image_host_id = Settings.get_preferred_host()
     image_host_name = Settings.image_hosts[image_host_id]['name']
@@ -36,8 +35,7 @@ def main():
     release_info = rls.get_complete_mediainfo()
 
     print('Generating screenshots')
-    screenshot_gen = ScreenshotGenerator()
-    images = screenshot_gen.generate_screenshots(rls)
+    images = ScreenshotGenerator().generate_screenshots(rls)
 
     print( 'Uploading images to {}'.format(image_host_name) )
     gallery_name = Helper.get_gallery_name(sys.argv[1])

@@ -8,19 +8,27 @@ from DvdAnalyzer import DvdAnalyzer
 
 VIDEO_FILE_TYPES = ('.mkv', '.avi', '.mp4', '.ts')
 
+
 class ReleaseInfo:
     mediainfo_complete_name_re = r'(Complete name *:).+'
 
-    def __init__(self, input_path):
+    def __init__(self, input_path: str):
+        """
+        :param input_path (str): Input path from sys.argv / parameters passed into ReleaseInfoCreator.py
+        """
         self.input_path = input_path
         self.release_type = ''
-        self.primary_ifo_info = ''
+        self.primary_ifo_info = {}
         self.main_video_files = []
         self.media_infos = []
 
-    def get_complete_mediainfo(self):
-        relevant_files = self._get_relevant_files()
+    def get_complete_mediainfo(self) -> str:
+        """
+        Gathers mediainfo for video file. If DVD folder, gather mediainfo from primary IFO file as well
+        :return str: All mediainfos gathered, joined to a single string
+        """
         header = ''
+        relevant_files = self._get_relevant_files()
         if self.release_type == 'dvd':
             header = '[size=4][b]' + os.path.basename(self.input_path) + '[/b][/size]\n\n'
 
@@ -39,7 +47,11 @@ class ReleaseInfo:
 
         return header + ''.join(self.media_infos)
 
-    def _get_relevant_files(self):
+    def _get_relevant_files(self) -> list:
+        """
+        Gets relevant video files for mediainfo. If DVD, includes the primary IFO along with the primary VOB file
+        :return list<str>: file paths of primary IFO (if applicable) and primary video file
+        """
         # check if user-set path is of a proper video type
         if os.path.isfile(self.input_path) and self.input_path.endswith(VIDEO_FILE_TYPES):
             self.release_type = 'single'

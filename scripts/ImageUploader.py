@@ -17,14 +17,19 @@ class ImageUploader:
     # basic tagging for the image hosts that don't provide thumb urls
     basic_img_url_template = Template('[img]$direct_url[/img]')
 
-    def __init__(self, images, gallery_name, image_host_id=-1):
+    def __init__(self, images: str, gallery_name: str, image_host_id=-1):
         assert image_host_id != -1, 'Error: No image host has been chosen'
 
         self.image_host = Settings.image_hosts[image_host_id]
         self.images = images
         self.image_urls = ''
+        self.gallery_name = gallery_name
 
     def get_image_urls(self):
+        """
+        Gets image urls for the already-uploaded images
+        :return (list<str>): list of image URLs
+        """
         return self.image_urls
 
     def upload(self):
@@ -94,7 +99,7 @@ class ImageUploader:
             'username': self.image_host['username'],
             'passkey': self.image_host['api_key'],
             'galleryoption': '1',
-            'galleryname': gallery_name
+            'galleryname': self.gallery_name
         }
         files = {}
 

@@ -13,11 +13,10 @@ class DvdAnalyzer:
     def __init__(self, input_path):
         self.video_ts_folder_path = os.path.join(input_path, 'VIDEO_TS')
 
-    def get_primary_ifo_info(self):
+    def get_primary_ifo_info(self) -> dict:
         """
-        Gathers mediainfo on all ifo files. Returns ifo file with longest runtime,
-        which indicates the total runtime of movie
-        :return: file path (str)
+        Gathers mediainfo on all IFO files and determines which is the primary IFO
+        :return dict: Contains the path of the primary IFO file, as well as its mediainfo
         """
         ifo_files = [os.path.join(self.video_ts_folder_path, f)
                      for f in os.listdir(self.video_ts_folder_path) if f.endswith(IFO_EXTS)]
@@ -46,10 +45,10 @@ class DvdAnalyzer:
                     continue
         return {'path': primary_ifo_file, 'mediainfo_json': primary_mediainfo_json}
 
-    def get_main_vob_files(self):
+    def get_main_vob_files(self) -> list:
         """
         Get primary movie VOB files (ie. largest-size VOB files), which are similar in size
-        :return: file path (str)
+        :return list<str>: File paths of the VOB files found
         """
         vob_files = [os.path.join(self.video_ts_folder_path, f)
                      for f in os.listdir(self.video_ts_folder_path) if f.endswith(VOB_EXTS)]

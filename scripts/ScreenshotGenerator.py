@@ -9,12 +9,21 @@ from Settings import Settings
 
 class ScreenshotGenerator:
     def __init__(self, n_images=6):
+        """
+        :param n_images (int): Number of screenshots to generate; 6 chosen as a baseline
+        in case one or two screenshots come out blurry
+        """
         self.n_images = n_images
         self.display_width = 0
         self.display_height = 0
         self.param_DAR = ''
 
-    def generate_screenshots(self, rls):
+    def generate_screenshots(self, rls: object) -> list:
+        """
+        Generates screenshot for video file/DVD
+        :param rls (ReleaseInfo): release info of file/DVD, containing paths and any already-gathered mediainfos
+        :return list<str>: Return list<str> of the resulting .png image file paths
+        """
         saved_images = []
         timestamp_data = self._get_timestamp_data(rls)
 
@@ -31,12 +40,12 @@ class ScreenshotGenerator:
 
                 args = r'"{ffmpeg_bin_location}" -hide_banner -loglevel panic -ss {timestamp} -i "{video_filepath}" ' \
                        r'-vf "select=gt(scene\,0.01)" {param_DAR} -r 1 -frames:v 1 "{output_filepath}.png"'.format(
-                    ffmpeg_bin_location=Settings.paths['ffmpeg_bin_path'],
-                    timestamp=timestamp,
-                    video_filepath=video_filepath,
-                    param_DAR=self.param_DAR,
-                    output_filepath=output_filepath
-                )
+                        ffmpeg_bin_location=Settings.paths['ffmpeg_bin_path'],
+                        timestamp=timestamp,
+                        video_filepath=video_filepath,
+                        param_DAR=self.param_DAR,
+                        output_filepath=output_filepath
+                        )
                 subprocess.run(args, shell=True)
                 temp_num += 1
 
@@ -48,7 +57,13 @@ class ScreenshotGenerator:
 
         return self._keep_n_largest(saved_images)
 
-    def _get_timestamp_data(self, rls):
+    def _get_timestamp_data(self, rls: object) -> list:
+        """
+        Determines the timestamps in each file of rls.main_video_files in which to take a screenshot
+        :param rls (ReleaseInfo): Object containing video's/DVD's paths and any already-gathered mediainfo
+        :return list<dict>: Items in list contain the timestamps at which to take a screenshot
+                            for each file in rls.main_video_files
+        """
         main_files_data = self._get_runtime_data(rls)
         timestamp_data = []
 
@@ -72,7 +87,13 @@ class ScreenshotGenerator:
 
         return timestamp_data
 
-    def _get_runtime_data(self, rls):
+    def _get_runtime_data(self, rls: object) -> dict:
+        """
+        Gathers time length of each file in rls.main_video_files and adds to a total
+        Keeps track of time length of each file
+        :param rls (ReleaseInfo): Object containing video's/DVD's paths and any already-gathered mediainfo
+        :return dict: Contains total run-time and run-time for each file in rls.main_video_files
+        """
         main_files_data = {
             'total_runtime': 0,
             'runtime_data': []
@@ -92,7 +113,12 @@ class ScreenshotGenerator:
 
         return main_files_data
 
-    def _get_display_dimensions(self, rls):
+    def _get_display_dimensions(self, rls: object) -> tuple:
+        """
+        Gets proper display dimensions of video, in distinction to the pixel dimensions; pixels may not always be square
+        :param rls (ReleaseInfo): Object containing video's/DVD's paths and any already-gathered mediainfo
+        :return tuple<int>: Video dimensions: width, height
+        """
         mediainfo_json = {}
 
         if rls.release_type == 'dvd':
@@ -121,7 +147,7 @@ class ScreenshotGenerator:
 
         return display_width, display_height
 
-    def _keep_n_largest(self, saved_images):
+    def _keep_n_largest(self, saved_images: list) -> list:
         """
         # Smallest JPG files will contain the least detail - the 2 smallest will be discarded.
         # This will keep the largest JPG files' respective PNG files (from which they were compressed), and upload them
@@ -140,8 +166,14 @@ class ScreenshotGenerator:
 
         return [f['path'] + '.png' for f in saved_images[0:self.n_images]]
 
-    def _get_video_data(self, mediainfo_json):
+    @staticmethod
+    def _get_video_data(mediainfo_json: dict) -> dict:
+        """
+        Finds the video track in the mediainfo
+        :param mediainfo_json (dict): Complete mediainfo of a video file
+        :return dict: Attributes of the video file's video track
+        """
         for track in mediainfo_json['media']['track']:
             if track['@type'] == 'Video':
                 return track
-        return None
+        return {}
