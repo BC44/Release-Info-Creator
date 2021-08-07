@@ -1,5 +1,5 @@
 import datetime
-import json
+import Helper
 import os
 import subprocess
 from PIL import Image
@@ -8,130 +8,148 @@ from Settings import Settings
 
 
 class ScreenshotGenerator:
+    FFMPEG_SCREENSHOT_ARGS = r'"{ffmpeg_bin_location}" -hide_banner -loglevel panic -ss {timestamp} ' \
+                             r'-i "{video_filepath}" -vf "select=gt(scene\,0.01)" {param_DAR} -r 1 ' \
+                             r'-frames:v 1 "{output_filepath}"'
+
     def __init__(self, n_images=6):
         """
-        :param n_images (int): Number of screenshots to generate; 6 chosen as a baseline
-        in case one or two screenshots come out blurry
+        :param n_images (int): Number of screenshots to generate; 2 extra images will be generated
+        in case some come out dark/blurry;
         """
-        self.n_images = n_images
-        self.display_width = 0
-        self.display_height = 0
+        self.n_final_images = n_images
+        self.n_total_images = n_images + 2
+        self.saved_images = []
+
         self.param_DAR = ''
 
     def generate_screenshots(self, rls: object) -> list:
         """
-        Generates screenshot for video file/DVD
-        :param rls (ReleaseInfo): release info of file/DVD, containing paths and any already-gathered mediainfos
-        :return list<str>: Return list<str> of the resulting .png image file paths
-        """
-        saved_images = []
-        timestamp_data = self._get_timestamp_data(rls)
-
-        self.display_width, self.display_height = self._get_display_dimensions(rls)
-        self.param_DAR = f'-vf "scale={self.display_width}:{self.display_height}"'
-
-        temp_num = 0
-        for data in timestamp_data:
-            video_filepath = data['path']
-            for timestamp in data['timestamps']:
-                now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
-                output_file = f'snapshot_{temp_num} {now}'
-                output_filepath = os.path.join(Settings.paths['image_save_location'], output_file)
-
-                args = r'"{ffmpeg_bin_location}" -hide_banner -loglevel panic -ss {timestamp} -i "{video_filepath}" ' \
-                       r'-vf "select=gt(scene\,0.01)" {param_DAR} -r 1 -frames:v 1 "{output_filepath}.png"'.format(
-                        ffmpeg_bin_location=Settings.paths['ffmpeg_bin_path'],
-                        timestamp=timestamp,
-                        video_filepath=video_filepath,
-                        param_DAR=self.param_DAR,
-                        output_filepath=output_filepath
-                        )
-                subprocess.run(args, shell=True)
-                temp_num += 1
-
-                picture = Image.open(f'{output_filepath}.png')
-                picture.save(f'{output_filepath}.jpg', optimize=True, quality=15)
-
-                compressed_size = os.path.getsize(f'{output_filepath}.jpg')
-                saved_images.append({'path': output_filepath, 'size': compressed_size})
-
-        return self._keep_n_largest(saved_images)
-
-    def _get_timestamp_data(self, rls: object) -> list:
-        """
-        Determines the timestamps in each file of rls.main_video_files in which to take a screenshot
+        Generate screenshots for file or DVD
         :param rls (ReleaseInfo): Object containing video's/DVD's paths and any already-gathered mediainfo
-        :return list<dict>: Items in list contain the timestamps at which to take a screenshot
-                            for each file in rls.main_video_files
+        :return:
         """
-        main_files_data = self._get_runtime_data(rls)
-        timestamp_data = []
 
-        min_timestamp_secs = int(main_files_data['total_runtime'] * 0.05)
-        max_timestamp_secs = int(main_files_data['total_runtime'] * 0.6)
-        increase_interval_secs = (max_timestamp_secs - min_timestamp_secs) // self.n_images
+        display_width, display_height = self._get_display_dimensions(rls)
+        self.param_DAR = f'-vf "scale={display_width}:{display_height}"'
 
-        timestamp = min_timestamp_secs
-        num_remaining = self.n_images
-        for filedata in main_files_data['runtime_data']:
-            timestamps = []
-            while num_remaining > 0 and timestamp < filedata['runtime']:
-                timestamps.append(timestamp)
-                timestamp += increase_interval_secs
-                num_remaining -= 1
+        if rls.release_type == 'dvd':
+            general_info = Helper.get_track(rls.primary_ifo_info['mediainfo_json'], track_type='General')
+        else:
+            mediainfo_json = Helper.get_mediainfo_json(rls.main_video_files[0])
+            general_info = Helper.get_track(mediainfo_json, track_type='General')
 
-            if timestamp > filedata['runtime']:
-                timestamp -= int(filedata['runtime'] - 1)
-            if timestamps:
-                timestamp_data.append({'path': filedata['path'], 'timestamps': timestamps})
+        total_runtime_secs = float(general_info['Duration'])
+        # first screenshot will be at the 5% mark of the duration
+        min_timestamp_secs = total_runtime_secs * 0.05
+        # last screenshot should be at the 60% mark of the duration; prevents late-video spoilers
+        max_timestamp_secs = total_runtime_secs * 0.6
 
-        return timestamp_data
+        screenshot_interval = (max_timestamp_secs - min_timestamp_secs) // self.n_total_images
+        current_timestamp = min_timestamp_secs
 
-    def _get_runtime_data(self, rls: object) -> dict:
+        # import pdb; pdb.set_trace()
+        for video_file in rls.main_video_files:
+            next_timestamp = self._take_screenshots(video_file, current_timestamp, screenshot_interval)
+            current_timestamp = next_timestamp
+
+        compressed_images = self._create_compressed_images()
+        self.saved_images = self._discard_smallest_images(compressed_images)
+
+        return self.saved_images
+
+    def _take_screenshots(self, video_file: str, current_timestamp: float, screenshot_interval: float) -> float:
         """
-        Gathers time length of each file in rls.main_video_files and adds to a total
-        Keeps track of time length of each file
-        :param rls (ReleaseInfo): Object containing video's/DVD's paths and any already-gathered mediainfo
-        :return dict: Contains total run-time and run-time for each file in rls.main_video_files
+        Take screenshots for a given video file.
+        :param video_file (str): path to video file
+        :param current_timestamp (float): timestamp at which to take the screenshot
+        :param screenshot_interval (float): interval by which to increase the timestamp for the next screenshot
+        :return next_timestamp (float): time stamp for the next video; applicable only for DVDs where
+                there are multiple VOB files. Screenshots will span throughout several files
         """
-        main_files_data = {
-            'total_runtime': 0,
-            'runtime_data': []
-        }
+        mediainfo_json = Helper.get_mediainfo_json(video_file)
+        general_info = Helper.get_track(mediainfo_json, track_type='General')
+        duration_seconds = float(general_info.get('Duration'))
 
-        for video_filepath in rls.main_video_files:
-            args = '"{mediainfo_bin_location}" --Output=JSON "{video_filepath}"'.format(
-                mediainfo_bin_location=Settings.paths['mediainfo_bin_path'],
-                video_filepath=video_filepath
-            )
-            mediainfo_json = subprocess.check_output(args, shell=True).decode()
-            mediainfo_json = json.loads(mediainfo_json)
-            total_runtime_secs = float(mediainfo_json['media']['track'][0]['Duration'])
+        while current_timestamp < duration_seconds and len(self.saved_images) < self.n_total_images:
+            image_file = self._execute_screenshot(current_timestamp, video_file)
+            self.saved_images.append(image_file)
+            current_timestamp += screenshot_interval
 
-            main_files_data['total_runtime'] += total_runtime_secs
-            main_files_data['runtime_data'].append({'path': video_filepath, 'runtime': total_runtime_secs})
+        next_timestamp = current_timestamp - duration_seconds
+        return next_timestamp
 
-        return main_files_data
+    def _execute_screenshot(self, timestamp: float, video_file: str) -> str:
+        """
+        Take a screenshot for video_file at given timestamp
+        :param timestamp (float): timestamp at which to take a screenshot
+        :param video_file (str): path to video file
+        :return output_filepath (str): File path for the resulting PNG screenshot file
+        """
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
+        output_filename = 'snapshot_{num} {now}.png'.format(num=len(self.saved_images), now=now)
+        output_filepath = os.path.join(Settings.paths['image_save_location'], output_filename)
 
-    def _get_display_dimensions(self, rls: object) -> tuple:
+        args = self.FFMPEG_SCREENSHOT_ARGS.format(
+            ffmpeg_bin_location=Settings.paths['ffmpeg_bin_path'],
+            timestamp=timestamp,
+            video_filepath=video_file,
+            param_DAR=self.param_DAR,
+            output_filepath=output_filepath
+        )
+        subprocess.run(args, shell=True)
+
+        return output_filepath
+
+    def _create_compressed_images(self) -> list:
+        """
+        Create compressed images from the PNG files generated.
+        :return compressed_images (list<str>): List of paths of the resulting compressed image files
+        """
+        compressed_images = []
+        for image_path in self.saved_images:
+            image_path_no_ext = os.path.splitext(image_path)[0]
+            compressed_image_path = image_path_no_ext + '.jpg'
+
+            compressed_image = Image.open(image_path)
+            compressed_image.save(compressed_image_path, optimize=True, quality=15)
+
+            compressed_images.append(compressed_image_path)
+        return compressed_images
+
+    def _discard_smallest_images(self, compressed_images: list) -> list:
+        """
+        Discard out the lowest-detailed images; the lowest-detailed images carry a
+        distinctively lower file size when compressed (eg. dark frames; black transition frames)
+        :param compressed_images (list<str>): List of paths of the compressed image files
+        :return list<str>: List of uncompressed image file paths
+        """
+        compressed_images.sort(reverse=True, key=lambda x: os.path.getsize(x))
+        final_images = []
+
+        for i, image_path in enumerate(compressed_images):
+            uncompressed_image_path = os.path.splitext(image_path)[0] + '.png'
+            os.unlink(image_path)
+            if i >= self.n_final_images:
+                os.unlink(uncompressed_image_path)
+                continue
+
+            final_images.append(uncompressed_image_path)
+        return final_images
+
+    @staticmethod
+    def _get_display_dimensions(rls: object) -> (int, int):
         """
         Gets proper display dimensions of video, in distinction to the pixel dimensions; pixels may not always be square
         :param rls (ReleaseInfo): Object containing video's/DVD's paths and any already-gathered mediainfo
         :return tuple<int>: Video dimensions: width, height
         """
-        mediainfo_json = {}
-
         if rls.release_type == 'dvd':
             mediainfo_json = rls.primary_ifo_info['mediainfo_json']
         else:
-            args = '"{mediainfo_bin_location}" --Output=JSON "{info_file}"'.format(
-                mediainfo_bin_location=Settings.paths['mediainfo_bin_path'],
-                info_file=rls.main_video_files[0]
-            )
-            mediainfo_json = subprocess.check_output(args, shell=True).decode()
-            mediainfo_json = json.loads(mediainfo_json)
+            mediainfo_json = Helper.get_mediainfo_json(rls.main_video_files[0])
 
-        video_info = self._get_video_data(mediainfo_json)
+        video_info = Helper.get_track(mediainfo_json, track_type='Video')
 
         pixel_width = display_width = int(video_info['Width'])
         pixel_height = display_height = int(video_info['Height'])
@@ -139,41 +157,10 @@ class ScreenshotGenerator:
             return pixel_width, pixel_height
 
         dar_float = float(video_info['DisplayAspectRatio'])
-        temp_display_width = round(pixel_height * dar_float)
+        temp_display_width = int(pixel_height * dar_float)
         if temp_display_width >= pixel_width:
             display_width = temp_display_width
         else:
-            display_height = round(pixel_width / dar_float)
+            display_height = int(pixel_width / dar_float)
 
         return display_width, display_height
-
-    def _keep_n_largest(self, saved_images: list) -> list:
-        """
-        # Smallest JPG files will contain the least detail - the 2 smallest will be discarded.
-        # This will keep the largest JPG files' respective PNG files (from which they were compressed), and upload them
-        :param saved_images: (list) of file paths (str)
-        :return: (list) of file paths (str)
-        """
-        for i, _ in enumerate(saved_images):
-            for k in range(i + 1, len(saved_images)):
-                if saved_images[i]['size'] < saved_images[k]['size']:
-                    saved_images[k], saved_images[i] = saved_images[i], saved_images[k]
-
-        for i, file in enumerate(saved_images):
-            os.unlink(file['path'] + '.jpg')
-            if i >= self.n_images:
-                os.unlink(file['path'] + '.png')
-
-        return [f['path'] + '.png' for f in saved_images[0:self.n_images]]
-
-    @staticmethod
-    def _get_video_data(mediainfo_json: dict) -> dict:
-        """
-        Finds the video track in the mediainfo
-        :param mediainfo_json (dict): Complete mediainfo of a video file
-        :return dict: Attributes of the video file's video track
-        """
-        for track in mediainfo_json['media']['track']:
-            if track['@type'] == 'Video':
-                return track
-        return {}
