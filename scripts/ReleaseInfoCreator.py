@@ -16,20 +16,14 @@ CLEAR_FN = 'cls' if os.name == 'nt' else 'clear'
 
 
 def main():
-    if len(sys.argv) == 1:
-        Settings.query_options()
-        exit()
-
     Settings.load_settings()
-
-    image_host_id = Settings.get_preferred_host()
-    image_host_name = Settings.image_hosts[image_host_id]['name']
+    image_host = Settings.get_preferred_host()
 
     assert len(sys.argv) > 1, 'Error, need input file'
 
     subprocess.run(CLEAR_FN, shell=True)
 
-    print( 'Image host "{}" will be used for uploading\n'.format(image_host_name) )
+    print( 'Image host "{}" will be used for uploading\n'.format(image_host['name']) )
     print('Gathering media info')
     rls = ReleaseInfo( os.path.abspath(sys.argv[1]) )
     release_info = rls.get_complete_mediainfo()
@@ -37,9 +31,9 @@ def main():
     print('Generating screenshots')
     images = ScreenshotGenerator().generate_screenshots(rls)
 
-    print( 'Uploading images to {}'.format(image_host_name) )
+    print( 'Uploading images to {}'.format(image_host['name']) )
     gallery_name = Helper.get_gallery_name(sys.argv[1])
-    uploader = ImageUploader(images, gallery_name, image_host_id=image_host_id)
+    uploader = ImageUploader(images, gallery_name, image_host)
     uploader.upload()
     image_urls = uploader.get_image_urls()
 

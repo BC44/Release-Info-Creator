@@ -1,4 +1,8 @@
+import json
 import os
+import subprocess
+
+from Settings import Settings
 
 
 def get_largest_file(files: list) -> str:
@@ -36,3 +40,18 @@ def get_gallery_name(input_path: str) -> str:
         gallery_name += ' - {res}'.format(res=guessed_data['screen_size'])
 
     return gallery_name
+
+
+def get_mediainfo_json(file: str) -> dict:
+    args = [Settings.paths['mediainfo_bin_path'], '--Output=JSON', file]
+    mediainfo_json = subprocess.check_output(args).decode()
+    mediainfo_json = json.loads(mediainfo_json)
+
+    return mediainfo_json
+
+
+def get_track(mediainfo_json: dict, track_type=None) -> dict:
+    for track in mediainfo_json['media']['track']:
+        if track['@type'] == track_type:
+            return track
+    return {}

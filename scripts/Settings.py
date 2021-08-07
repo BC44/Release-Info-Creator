@@ -150,6 +150,7 @@ class Settings:
         cls.print_not_copy = True if \
             input('\nPrint mediainfo + image URLs to console instead of copying '
                   'to clipboard [Y/n]? ').lower().strip() == 'y' else False
+
     @classmethod
     def _query_bbcode_tags(cls):
         cls.use_bbcode_tags = True if \
@@ -166,15 +167,15 @@ class Settings:
         }
 
     @classmethod
-    def get_preferred_host(cls) -> int:
+    def get_preferred_host(cls) -> dict:
         """
         Get user input for preferred host to upload with
         :return int: index of image host in list
         """
-        default_host_index = cls._get_default_host()
+        default_host = cls._get_default_host()
         # If image host has 'default' flag set, skip query and use that
-        if default_host_index != -1:
-            return default_host_index
+        if default_host:
+            return default_host
 
         bad_choice_msg = ''
         max_num = len(cls.image_hosts)
@@ -190,7 +191,7 @@ class Settings:
                 print(f'  {i + 1}: {host_name}{set_str}')
 
             choice = input(f'\nYour choice (between {1} and {max_num}): ')
-            if not choice.isnumeric() or not ( int(choice) >= 1 and int(choice) <= max_num ):
+            if not choice.isnumeric() or not ( 1 <= int(choice) and int(choice) <= max_num ):
                 bad_choice_msg = 'Bad choice. Try again.\n'
                 subprocess.run(CLEAR_FN, shell=True)
                 continue
@@ -199,18 +200,18 @@ class Settings:
                 subprocess.run(CLEAR_FN, shell=True)
                 continue
             else:
-                return int(choice) - 1
+                return cls.image_hosts[ int(choice) - 1 ]
 
     @classmethod
-    def _get_default_host(cls) -> int:
+    def _get_default_host(cls) -> dict:
         """
         Find image host that has the `default` value set to True
         :return int: index of image host in list
         """
-        for i, image_host in enumerate(cls.image_hosts):
+        for image_host in cls.image_hosts:
             if image_host['default']:
-                return i
-        return -1
+                return image_host
+        return {}
 
     # append keys and values to json file if it is missing them (if new settings were added since a
     # previous iteration of this script)

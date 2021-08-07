@@ -21,7 +21,7 @@ class DvdAnalyzer:
         ifo_files = [os.path.join(self.video_ts_folder_path, f)
                      for f in os.listdir(self.video_ts_folder_path) if f.endswith(IFO_EXTS)]
 
-        # Preliminary choosing.
+        # Preliminary choosing; pick first IFO file as the primary
         primary_ifo_file = ifo_files[0]
         primary_mediainfo_json = {}
         longest_duration = 0
