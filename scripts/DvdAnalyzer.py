@@ -24,16 +24,16 @@ class DvdAnalyzer:
 
         for ifo_file in ifo_files:
             mediainfo_json = Helper.get_mediainfo_json(ifo_file)
+            general_info = Helper.get_track(mediainfo_json, track_type='General')
+            if general_info.get('Duration') is None:
+                continue
 
-            for track in mediainfo_json['media']['track']:
-                if track['@type'] == 'General':
-                    if track.get('Duration') is None:
-                        continue
-                    if float(track['Duration']) > longest_duration:
-                        longest_duration = float(track['Duration'])
-                        primary_ifo_file = ifo_file
-                        primary_mediainfo_json = mediainfo_json
-                    continue
+            duration_secs = float(general_info['Duration'])
+            if duration_secs > longest_duration:
+                longest_duration = duration_secs
+                primary_ifo_file = ifo_file
+                primary_mediainfo_json = mediainfo_json
+                
         return {'path': primary_ifo_file, 'mediainfo_json': primary_mediainfo_json}
 
     def get_main_vob_files(self) -> list:
