@@ -1,9 +1,5 @@
-import json
 import os
-import subprocess
-
 import Helper
-from Settings import Settings
 
 VOB_EXTS = ('.vob', '.VOB')
 IFO_EXTS = ('.ifo', '.IFO')
@@ -27,12 +23,7 @@ class DvdAnalyzer:
         longest_duration = 0
 
         for ifo_file in ifo_files:
-            args = '"{mediainfo_bin_location}" --Output=JSON "{ifo_file}"'.format(
-                mediainfo_bin_location=Settings.paths['mediainfo_bin_path'],
-                ifo_file=ifo_file
-                )
-            mediainfo_json = subprocess.check_output(args, shell=True).decode()
-            mediainfo_json = json.loads(mediainfo_json)
+            mediainfo_json = Helper.get_mediainfo_json(ifo_file)
 
             for track in mediainfo_json['media']['track']:
                 if track['@type'] == 'General':
