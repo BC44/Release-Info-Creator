@@ -13,22 +13,22 @@ ENDPOINT_AHDIMG = 'https://img.awesome-hd.me/api/upload'
 
 
 class ImageUploader:
-    img_url_template = Template('[url=$direct_url][img]$thumb_url[/img][/url]')
-    # basic tagging for the image hosts that don't provide thumb urls
-    basic_img_url_template = Template('[img]$direct_url[/img]')
+    # basic bbcode tagging for the image hosts that don't provide thumbnails
+    bbcoded_img_url_template = Template('[img]$direct_url[/img]')
+    thumbnailed_bbcoded_img_url_template = Template('[url=$direct_url][img]$thumb_url[/img][/url]')
 
-    def __init__(self, images: list, gallery_name: str, image_host):
+    def __init__(self, image_files: list, gallery_name: str, image_host):
         self.image_host = image_host
-        self.images = images
-        self.image_urls = ''
+        self.image_files = image_files
+        self.formatted_urls = ''
         self.gallery_name = gallery_name
 
-    def get_image_urls(self):
+    def get_formatted_urls(self) -> str:
         """
         Gets image urls for the already-uploaded images
-        :return (list<str>): list of image URLs
+        :return str: formatted string containing image URLs
         """
-        return self.image_urls
+        return self.formatted_urls
 
     def upload(self):
         if self.image_host['name'] == 'ptpimg':
@@ -42,15 +42,15 @@ class ImageUploader:
             exit()
 
     def _upload_imgbb(self):
-        for i, image in enumerate(self.images):
+        form_data = dict(key=self.image_host['api_key'])
+
+        for i, image in enumerate(self.image_files):
             now = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
             with open(image, 'rb') as f:
-                formdata = {
-                    'key': self.image_host['api_key'],
-                    'image': base64.b64encode(f.read()),
-                    'name': f'{i}_snapshot {now}'
-                }
-                resp = requests.post(url=ENDPOINT_IMGBB, data=formdata)
+                form_data['image'] = base64.b64encode(f.read())
+                form_data['name'] = f'{i}_snapshot {now}'
+
+                resp = requests.post(url=ENDPOINT_IMGBB, data=form_data)
 
             assert resp.ok, f'IMGBB returned status code {resp.status_code}'
             resp_json = resp.json()
@@ -58,56 +58,58 @@ class ImageUploader:
             thumb_url = resp_json['data']['medium']['url']
 
             if Settings.use_bbcode_tags:
-                self.image_urls += self.img_url_template.safe_substitute(
+                bbcoded_image_url = self.thumbnailed_bbcoded_img_url_template.safe_substitute(
                     direct_url=direct_url,
                     thumb_url=thumb_url
-                ) + '\n'
+                )
+                self.formatted_urls += bbcoded_image_url + '\n'
             else:
-                self.image_urls += direct_url + '\n'
+                self.formatted_urls += direct_url + '\n'
 
     def _upload_ptpimg(self):
-        data = {'api_key': self.image_host['api_key']}
+        form_data = dict(api_key=self.image_host['api_key'])
         files = {}
 
-        file_descriptors = [open(img, 'rb') for img in self.images]
+        file_descriptors = [open(img, 'rb') for img in self.image_files]
         for i, fd in enumerate(file_descriptors):
             # ptpimg does not retain filenames
             files[ f'file-upload[{i}]' ] = ('potatoes_boilem_mashem_ptpimg_dont_care', fd)
 
-        resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=data)
+        resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=form_data)
         assert resp.ok, f'PTPIMG returned status code {resp.status_code}'
-        resp_json = resp.json()
 
+        resp_json = resp.json()
         image_urls = ['https://ptpimg.me/{}.png'.format(img['code']) for img in resp_json]
 
         for direct_url in image_urls:
             if Settings.use_bbcode_tags:
-                self.image_urls += self.basic_img_url_template.safe_substitute(
+                bbcoded_image_url = self.bbcoded_img_url_template.safe_substitute(
                     direct_url=direct_url
-                ) + '\n'
+                )
+                self.formatted_urls += bbcoded_image_url + '\n'
             else:
-                self.image_urls += direct_url + '\n'
+                self.formatted_urls += direct_url + '\n'
         [fd.close() for fd in file_descriptors]
 
     def _upload_hdbimg(self):
-        # galleryoption == '0' indicates no new gallery will be created; value not honored; new gallery is
-        # created regardless
+        # galleryoption == '0' indicates no new gallery will be created
+        # galleryoption == '0' is not honored; new gallery is created regardless
         # galleryoption == '1' indicates new gallery will be created
-        data = {
-            'username': self.image_host['username'],
-            'passkey': self.image_host['api_key'],
-            'galleryoption': '1',
-            'galleryname': self.gallery_name
-        }
+        form_data = dict(
+            username=self.image_host['username'],
+            passkey=self.image_host['api_key'],
+            galleryoption='1',
+            galleryname=self.gallery_name
+        )
         files = {}
 
-        file_descriptors = [open(img, 'rb') for img in self.images]
+        file_descriptors = [open(img, 'rb') for img in self.image_files]
         for i, fd in enumerate(file_descriptors):
-            files[f'images_files[{i}]'] = (os.path.basename(self.images[i]), fd)
+            files[f'images_files[{i}]'] = (os.path.basename(self.image_files[i]), fd)
 
-        resp = requests.post(url=ENDPOINT_HDBIMG, files=files, data=data)
+        resp = requests.post(url=ENDPOINT_HDBIMG, files=files, data=form_data)
         assert resp.ok, f'HDBIMG returned status code {resp.status_code}'
 
         # image urls come pre-formatted for use within hdbits
-        self.image_urls = resp.text
+        self.formatted_urls = resp.text
         [fd.close() for fd in file_descriptors]

@@ -35,13 +35,13 @@ def main():
     gallery_name = Helper.get_gallery_name(sys.argv[1])
     uploader = ImageUploader(images, gallery_name, image_host)
     uploader.upload()
-    image_urls = uploader.get_image_urls()
+    formatted_urls = uploader.get_formatted_urls()
 
     if Settings.print_not_copy:
         subprocess.run(CLEAR_FN, shell=True)
-        print(release_info + image_urls)
+        print(release_info + formatted_urls)
     else:
-        pyperclip.copy(release_info + image_urls)
+        pyperclip.copy(release_info + formatted_urls)
         print('\nMediainfo + image URLs have been copied to clipboard')
         time.sleep(5)
 
