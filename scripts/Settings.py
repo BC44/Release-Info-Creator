@@ -41,6 +41,7 @@ class Settings:
     image_hosts = IMAGE_HOSTS_SKELETON
     print_not_copy = False
     use_bbcode_tags = False
+    use_png_optimise = False
 
     @classmethod
     def load_settings(cls):
@@ -57,6 +58,7 @@ class Settings:
             cls.image_hosts = settings_from_file['image_hosts']
             cls.print_not_copy = settings_from_file.get('print_not_copy')
             cls.use_bbcode_tags = settings_from_file.get('use_bbcode_tags')
+            cls.use_png_optimise = settings_from_file.get('use_png_optimise')
 
             cls._append_missing_settings(settings_from_file)
             cls._expand_paths()
@@ -82,6 +84,8 @@ class Settings:
             'FFmpeg file does not exist: {}'.format(cls.paths['ffmpeg_bin_path'])
         assert os.path.isfile(cls.paths['mediainfo_bin_path']), \
             'Mediainfo file does not exist: {}'.format(cls.paths['mediainfo_bin_path'])
+        assert (cls.use_png_optimise and os.path.isfile(cls.paths['oxipng_bin_path'])) or not cls.use_png_optimise, \
+            'Oxipng file does not exist: {}'.format(cls.paths['oxipng_bin_path'])
 
     @classmethod
     def _query_new_settings(cls):
@@ -144,6 +148,7 @@ class Settings:
         cls.paths['image_save_location'] = input('\nInput the image save directory: ').strip()
         cls.paths['ffmpeg_bin_path'] = input('Input the full path for the ffmpeg binary: ').strip()
         cls.paths['mediainfo_bin_path'] = input('Input the full path for the mediainfo binary: ').strip()
+        cls.paths['oxipng_bin_path'] = input('Input the full path for the oxipng binary: ').strip()
 
     @classmethod
     def _query_print_not_copy(cls):
@@ -158,12 +163,25 @@ class Settings:
                   'image urls [Y/n]? ').lower().strip() == 'y' else False
 
     @classmethod
+    def _query_use_png_optimise(cls):
+        cls.use_png_optimise = True if \
+            input('\nUse image optimization for '
+                  'uploaded image [Y/n]? ').lower().strip() == 'y' else False
+
+    @classmethod
+    def _query_oxipng_path(cls):
+        cls.paths["oxipng_bin_path"] = \
+            input('\nPath for Oxipng? '
+                  '(Not need if not using image optimization) ')
+
+    @classmethod
     def _get_settings_dict(cls) -> dict:
         return {
             'paths': cls.paths,
             'image_hosts': cls.image_hosts,
             'print_not_copy': cls.print_not_copy,
-            'use_bbcode_tags': cls.use_bbcode_tags
+            'use_bbcode_tags': cls.use_bbcode_tags,
+            'use_png_optimise': cls.use_png_optimise,
         }
 
     @classmethod
@@ -243,6 +261,16 @@ class Settings:
             print(cls.new_settings_message)
             is_missing_settings = True
             cls._query_bbcode_tags()
+
+        if settings_from_file.get('use_png_optimise') is None:
+            print(cls.new_settings_message)
+            is_missing_settings = True
+            cls._query_use_png_optimise()
+
+        if settings_from_file["paths"].get('oxipng_bin_path') is None:
+            print(cls.new_settings_message)
+            is_missing_settings = True
+            cls._query_oxipng_path()
 
         if is_missing_settings:
             with open(cls.settings_file_path, 'w', encoding='utf8') as f:

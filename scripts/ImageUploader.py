@@ -70,16 +70,38 @@ class ImageUploader:
         form_data = dict(api_key=self.image_host['api_key'])
         files = {}
 
-        file_descriptors = [open(img, 'rb') for img in self.image_files]
-        for i, fd in enumerate(file_descriptors):
+        file_descriptors = []
+        image_urls = []
+        totalsize = 0        
+        for img in self.image_files:
+            size = os.path.getsize(img)
+            # PTPIMG uses CloudFlare which has a 100mb upload limit, so we split into batches <100mb
+            # This limit can be hit with 4k files
+            if totalsize + size > 100000000:
+                # ptpimg does not retain filenames
+                print(f'Uploading {len(files)} images totaling {round(totalsize /1000000, 2)}mb')
+                resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=form_data)
+                assert resp.ok, f'PTPIMG returned status code {resp.status_code}'
+
+                resp_json = resp.json()
+                image_urls = image_urls + ['https://ptpimg.me/{}.png'.format(img['code']) for img in resp_json]
+                files = {}
+                totalsize = 0
+
+            fd = open(img, 'rb')
+            file_descriptors.append(fd)
+            files[ f'file-upload[{len(files)}]' ] = ('potatoes_boilem_mashem_ptpimg_dont_care', fd)
+            totalsize += size
+
+        if len(files) > 0:
             # ptpimg does not retain filenames
-            files[ f'file-upload[{i}]' ] = ('potatoes_boilem_mashem_ptpimg_dont_care', fd)
+            print(f'Uploading {len(files)} images totaling {round(totalsize / 1000/1000, 2)}mb')
+            resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=form_data)
+            assert resp.ok, f'PTPIMG returned status code {resp.status_code}'
 
-        resp = requests.post(url=ENDPOINT_PTPIMG, files=files, data=form_data)
-        assert resp.ok, f'PTPIMG returned status code {resp.status_code}'
-
-        resp_json = resp.json()
-        image_urls = ['https://ptpimg.me/{}.png'.format(img['code']) for img in resp_json]
+            resp_json = resp.json()
+            image_urls = image_urls + ['https://ptpimg.me/{}.png'.format(img['code']) for img in resp_json]
+            files = {}
 
         for direct_url in image_urls:
             if Settings.use_bbcode_tags:

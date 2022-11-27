@@ -1,4 +1,5 @@
 import datetime
+from typing import Tuple
 import Helper
 import os
 import subprocess
@@ -11,6 +12,8 @@ class ScreenshotGenerator:
     FFMPEG_SCREENSHOT_ARGS = r'"{ffmpeg_bin_location}" -hide_banner -loglevel panic -ss {timestamp} ' \
                              r'-i "{video_filepath}" -vf "select=gt(scene\,0.01)" {param_DAR} -r 1 ' \
                              r'-frames:v 1 "{output_filepath}"'
+
+    OXIPNG_ARGS = r'"{oxi_bin_location}" -o 2 -s -a {images}'
 
     def __init__(self, n_images=6):
         """
@@ -31,7 +34,7 @@ class ScreenshotGenerator:
         """
 
         display_width, display_height = self._get_display_dimensions(rls)
-        self.param_DAR = f'-vf "scale={display_width}:{display_height}"'
+        self.param_DAR = f'-vf "scale={display_width}:{display_height}:flags=full_chroma_int+full_chroma_inp+accurate_rnd+spline"'
 
         if rls.release_type == 'dvd':
             general_info = Helper.get_track(rls.primary_ifo_info['mediainfo_json'], track_type='General')
@@ -55,6 +58,7 @@ class ScreenshotGenerator:
 
         compressed_images = self._create_compressed_images()
         self.saved_images = self._discard_smallest_images(compressed_images)
+        if Settings.use_png_optimise: self._optimise_images()
 
         return self.saved_images
 
@@ -71,10 +75,15 @@ class ScreenshotGenerator:
         general_info = Helper.get_track(mediainfo_json, track_type='General')
         duration_seconds = float(general_info.get('Duration'))
 
+        processes: list[subprocess.Popen] = []
         while current_timestamp < duration_seconds and len(self.saved_images) < self.n_total_images:
-            image_file = self._execute_screenshot(current_timestamp, video_file)
+            image_file, process = self._execute_screenshot(current_timestamp, video_file)
+            processes.append(process)
             self.saved_images.append(image_file)
             current_timestamp += screenshot_interval
+
+        for proc in processes:
+            proc.wait()
 
         next_timestamp = current_timestamp - duration_seconds
         return next_timestamp
@@ -97,9 +106,9 @@ class ScreenshotGenerator:
             param_DAR=self.param_DAR,
             output_filepath=output_filepath
         )
-        subprocess.run(args, shell=True)
+        process = subprocess.Popen(args, shell=True)
 
-        return output_filepath
+        return output_filepath, process
 
     def _create_compressed_images(self) -> list:
         """
@@ -116,6 +125,21 @@ class ScreenshotGenerator:
 
             compressed_images.append(compressed_image_path)
         return compressed_images
+
+    def _optimise_images(self) -> None:
+        print("Optimizing images!")
+        processes = []
+        for img in self.saved_images:
+            proc = subprocess.Popen(self.OXIPNG_ARGS.format(
+                oxi_bin_location = Settings.paths['optimise_bin_path'],
+                images = f'"{img}"'
+            ), shell=True)
+
+            processes.append(proc)
+
+        for proc in processes:
+            proc.wait()
+
 
     def _discard_smallest_images(self, compressed_images: list) -> list:
         """
@@ -138,7 +162,7 @@ class ScreenshotGenerator:
         return final_images
 
     @staticmethod
-    def _get_display_dimensions(rls: object) -> (int, int):
+    def _get_display_dimensions(rls: object) -> Tuple[int, int]:
         """
         Gets proper display dimensions of video, in distinction to the pixel dimensions; pixels may not always be square
         :param rls (ReleaseInfo): Object containing video's/DVD's paths and any already-gathered mediainfo
