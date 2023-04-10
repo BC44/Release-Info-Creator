@@ -34,7 +34,7 @@ class ScreenshotGenerator:
         """
 
         display_width, display_height = self._get_display_dimensions(rls)
-        self.param_DAR = f'-vf "scale={display_width}:{display_height}:flags=full_chroma_int+full_chroma_inp+accurate_rnd+spline"'
+        self.param_DAR = f'-vf "scale={display_width}:{display_height}:flags=full_chroma_int+full_chroma_inp+accurate_rnd+spline" -pix_fmt rgb24'
 
         if rls.release_type == 'dvd':
             general_info = Helper.get_track(rls.primary_ifo_info['mediainfo_json'], track_type='General')
